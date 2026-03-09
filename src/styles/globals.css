@@ -525,8 +525,8 @@ textarea {
 
 .setup-copy {
   display: grid;
-  gap: 14px;
-  padding-top: 8px;
+  gap: 16px;
+  padding-top: 18px;
   position: sticky;
   top: 108px;
 }
@@ -543,6 +543,13 @@ textarea {
 .setup-form-stack {
   display: grid;
   gap: 12px;
+}
+
+.setup-support {
+  margin: 0;
+  max-width: 28ch;
+  color: var(--muted);
+  line-height: 1.55;
 }
 
 .setup-point {
@@ -589,6 +596,25 @@ textarea {
 
 .setup-actions {
   padding-top: 8px;
+}
+
+.field-hint {
+  color: var(--muted);
+  font-size: 0.92rem;
+  font-weight: 520;
+  line-height: 1.45;
+}
+
+.setup-static-field {
+  display: flex;
+  align-items: center;
+  min-height: 52px;
+  padding: 13px 15px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: rgba(246, 245, 241, 0.92);
+  color: var(--muted);
+  font-weight: 520;
 }
 
 .sidebar-stack {

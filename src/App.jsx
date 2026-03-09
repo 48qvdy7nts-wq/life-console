@@ -247,25 +247,24 @@ function buildWakePlanCopy(sleepModel, locale) {
   };
 }
 
-function buildSetupDraft(profile, areaNotes) {
+function deriveLatestReadyMinutes(morningBufferMinutes) {
+  const buffer = Math.max(0, Number(morningBufferMinutes) || 0);
+
+  if (buffer <= 30) {
+    return buffer;
+  }
+
+  return Math.max(15, buffer - 30);
+}
+
+function buildSetupDraft(profile) {
   return {
     displayName: profile?.displayName || "",
     wakeTime: profile?.wakeTime || defaultProfileWithAutomation.wakeTime,
-    latestReadyMinutes:
-      profile?.latestReadyMinutes || defaultProfileWithAutomation.latestReadyMinutes,
-    idealReadyMinutes:
+    morningBufferMinutes:
       profile?.idealReadyMinutes || defaultProfileWithAutomation.idealReadyMinutes,
     sleepTargetHours:
       profile?.sleepTargetHours || defaultProfileWithAutomation.sleepTargetHours,
-    gamingCutoff: profile?.gamingCutoff || defaultProfileWithAutomation.gamingCutoff,
-    notificationLeadMinutes:
-      profile?.notificationLeadMinutes || defaultProfileWithAutomation.notificationLeadMinutes,
-    academic: areaNotes?.academic || "",
-    work: areaNotes?.work || "",
-    social: areaNotes?.social || "",
-    love: areaNotes?.love || "",
-    hobbies: areaNotes?.hobbies || "",
-    future: areaNotes?.future || "",
     firstCommitmentTitle: "",
     firstCommitmentArea: "academic",
     firstCommitmentDueAt: "",
@@ -959,7 +958,7 @@ function App() {
   const [setupState, setSetupState] = useState(() =>
     normalizeSetupState(readStorage(STORAGE_KEYS.setup, {}))
   );
-  const [setupDraft, setSetupDraft] = useState(() => buildSetupDraft(profile, areaNotes));
+  const [setupDraft, setSetupDraft] = useState(() => buildSetupDraft(profile));
 
   const [draft, setDraft] = useState(defaultDraft);
   const [scenarioId, setScenarioId] = useState(scenarioDefinitions[0].id);
@@ -1669,12 +1668,7 @@ function App() {
       [name]:
         type === "checkbox"
           ? checked
-          : [
-                "latestReadyMinutes",
-                "idealReadyMinutes",
-                "sleepTargetHours",
-                "notificationLeadMinutes",
-              ].includes(name)
+          : ["morningBufferMinutes", "sleepTargetHours"].includes(name)
             ? toPositiveNumber(value, current[name])
             : value,
     }));
@@ -1683,25 +1677,18 @@ function App() {
   function handleSetupSubmit(event) {
     event.preventDefault();
 
+    const morningBufferMinutes = toPositiveNumber(
+      setupDraft.morningBufferMinutes,
+      profile.idealReadyMinutes
+    );
+
     const nextProfile = normalizeProfile({
       ...profile,
       displayName: setupDraft.displayName,
       wakeTime: setupDraft.wakeTime,
-      latestReadyMinutes: setupDraft.latestReadyMinutes,
-      idealReadyMinutes: setupDraft.idealReadyMinutes,
+      latestReadyMinutes: deriveLatestReadyMinutes(morningBufferMinutes),
+      idealReadyMinutes: morningBufferMinutes,
       sleepTargetHours: setupDraft.sleepTargetHours,
-      gamingCutoff: setupDraft.gamingCutoff,
-      notificationLeadMinutes: setupDraft.notificationLeadMinutes,
-    });
-
-    const nextAreaNotes = normalizeAreaNotes({
-      ...areaNotes,
-      academic: setupDraft.academic.trim(),
-      work: setupDraft.work.trim(),
-      social: setupDraft.social.trim(),
-      love: setupDraft.love.trim(),
-      hobbies: setupDraft.hobbies.trim(),
-      future: setupDraft.future.trim(),
     });
 
     let nextCustomItems = customItems;
@@ -1740,15 +1727,13 @@ function App() {
     });
 
     setProfile(nextProfile);
-    setAreaNotes(nextAreaNotes);
     setCustomItems(nextCustomItems);
     setSetupState(nextSetupState);
-    setSetupDraft(buildSetupDraft(nextProfile, nextAreaNotes));
+    setSetupDraft(buildSetupDraft(nextProfile));
     setFlash("steady", "Setup saved.");
 
     if (typeof window !== "undefined") {
       window.localStorage.setItem(STORAGE_KEYS.profile, JSON.stringify(nextProfile));
-      window.localStorage.setItem(STORAGE_KEYS.notes, JSON.stringify(nextAreaNotes));
       window.localStorage.setItem(STORAGE_KEYS.items, JSON.stringify(nextCustomItems));
       window.localStorage.setItem(STORAGE_KEYS.setup, JSON.stringify(nextSetupState));
       window.location.assign(buildPageHref(pageContext.basePath, "dashboard"));
@@ -2180,25 +2165,12 @@ function App() {
   const setupPageSection = (
     <section className="setup-shell reveal">
       <div className="setup-copy">
-        <p className="eyebrow">Setup</p>
-        <h1>Start with what the board should remember.</h1>
+        <p className="eyebrow">Quick setup</p>
+        <h1>Make the board yours.</h1>
         <p className="section-copy">
-          Name, timing, short context, and one real upcoming thing. Everything here stays editable.
+          Start with the basics: when you usually wake up, how much time you want before something timed, and the next real thing coming up.
         </p>
-        <div className="setup-points" aria-label="Setup notes">
-          <p className="setup-point">
-            <span className="meta-label">Local first</span>
-            <span>Saved in this browser unless you export or sync.</span>
-          </p>
-          <p className="setup-point">
-            <span className="meta-label">Wake logic</span>
-            <span>Used to decide when tomorrow should override tonight.</span>
-          </p>
-          <p className="setup-point">
-            <span className="meta-label">Start light</span>
-            <span>One real commitment is enough to make the board useful.</span>
-          </p>
-        </div>
+        <p className="setup-support">Everything here can be changed later in Systems, Areas, and Commitments.</p>
       </div>
 
       <form className="panel setup-form-card" onSubmit={handleSetupSubmit}>
@@ -2206,8 +2178,8 @@ function App() {
           <section className="setup-section-block">
             <div className="inline-heading">
               <div>
-                <span className="meta-label">01</span>
-                <h3>Identity and timing</h3>
+                <span className="meta-label">Basics</span>
+                <h3>Who you are</h3>
               </div>
             </div>
             <div className="form-row">
@@ -2231,26 +2203,28 @@ function App() {
                 />
               </label>
             </div>
-            <div className="form-row quad">
+          </section>
+
+          <section className="setup-section-block">
+            <div className="inline-heading">
+              <div>
+                <span className="meta-label">Timing</span>
+                <h3>Mornings</h3>
+              </div>
+            </div>
+            <div className="form-row">
               <label className="field-label">
-                Ideal-ready
+                Minutes you want before a class or date
                 <input
                   type="number"
                   min="0"
-                  name="idealReadyMinutes"
-                  value={setupDraft.idealReadyMinutes}
+                  name="morningBufferMinutes"
+                  value={setupDraft.morningBufferMinutes}
                   onChange={handleSetupDraftChange}
                 />
-              </label>
-              <label className="field-label">
-                Latest-ready
-                <input
-                  type="number"
-                  min="0"
-                  name="latestReadyMinutes"
-                  value={setupDraft.latestReadyMinutes}
-                  onChange={handleSetupDraftChange}
-                />
+                <span className="field-hint">
+                  Example: 60 means a 9:30 start aims for an 8:30 wake-up.
+                </span>
               </label>
               <label className="field-label">
                 Sleep target (hours)
@@ -2262,46 +2236,14 @@ function App() {
                   onChange={handleSetupDraftChange}
                 />
               </label>
-              <label className="field-label">
-                Gaming cutoff
-                <input
-                  type="time"
-                  name="gamingCutoff"
-                  value={setupDraft.gamingCutoff}
-                  onChange={handleSetupDraftChange}
-                />
-              </label>
             </div>
           </section>
 
           <section className="setup-section-block">
             <div className="inline-heading">
               <div>
-                <span className="meta-label">02</span>
-                <h3>Life notes</h3>
-              </div>
-            </div>
-            <div className="setup-note-grid">
-              {areaOrder.map((area) => (
-                <label key={area} className="field-label">
-                  {areaDefinitions[area].label}
-                  <textarea
-                    name={area}
-                    rows={3}
-                    value={setupDraft[area]}
-                    onChange={handleSetupDraftChange}
-                    placeholder={areaNotePrompts[area][0]}
-                  />
-                </label>
-              ))}
-            </div>
-          </section>
-
-          <section className="setup-section-block">
-            <div className="inline-heading">
-              <div>
-                <span className="meta-label">03</span>
-                <h3>First real commitment</h3>
+                <span className="meta-label">Next</span>
+                <h3>Next important thing</h3>
               </div>
             </div>
             <div className="form-row">
@@ -2340,15 +2282,10 @@ function App() {
                   onChange={handleSetupDraftChange}
                 />
               </label>
-              <label className="field-label checkbox-field">
-                Hard commitment
-                <input
-                  type="checkbox"
-                  name="firstCommitmentHard"
-                  checked={setupDraft.firstCommitmentHard}
-                  onChange={handleSetupDraftChange}
-                />
-              </label>
+              <div className="field-label">
+                Type
+                <div className="setup-static-field">Saved as a timed commitment</div>
+              </div>
             </div>
             <label className="field-label">
               Note
@@ -2357,7 +2294,7 @@ function App() {
                 rows={3}
                 value={setupDraft.firstCommitmentNote}
                 onChange={handleSetupDraftChange}
-                placeholder="Anything future-you should know when this comes up"
+                placeholder="Anything future-you should know"
               />
             </label>
           </section>
@@ -2368,7 +2305,7 @@ function App() {
               className="button-like ghost"
               href={buildPageHref(pageContext.basePath, "systems")}
             >
-              Go to imports instead
+              Detailed settings later
             </a>
           </div>
         </div>
