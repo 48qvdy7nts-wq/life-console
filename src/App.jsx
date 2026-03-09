@@ -831,7 +831,7 @@ function countRoutineProgress(period, routineState, now) {
   };
 }
 
-function SiteNav({ links, currentPageId, basePath }) {
+function SiteNav({ links, currentPageId, basePath, dashboardAction }) {
   const navLinks = links.filter((link) => link.nav !== false);
 
   if (currentPageId === "setup") {
@@ -843,6 +843,21 @@ function SiteNav({ links, currentPageId, basePath }) {
         <a className="mini-text-button" href={buildPageHref(basePath, "dashboard")}>
           Skip for now
         </a>
+      </header>
+    );
+  }
+
+  if (currentPageId === "dashboard") {
+    return (
+      <header className="site-nav reveal is-dashboard">
+        <div className="nav-brand">
+          <h1>Life Console</h1>
+        </div>
+        {dashboardAction ? (
+          <a className="mini-text-button" href={dashboardAction.href}>
+            {dashboardAction.label}
+          </a>
+        ) : null}
       </header>
     );
   }
@@ -882,14 +897,54 @@ function PageIntro({ eyebrow, title, copy, actions }) {
   );
 }
 
-function RouteCard({ href, eyebrow, title, detail, meta }) {
+function DashboardBubbleButton({ bubble, active, onToggle }) {
   return (
-    <a className="route-card panel reveal" href={href}>
-      <p className="eyebrow">{eyebrow}</p>
-      <h3>{title}</h3>
-      <p>{detail}</p>
-      {meta ? <p className="small-copy">{meta}</p> : null}
-    </a>
+    <button
+      type="button"
+      className={`dashboard-bubble ${active ? "is-active" : ""} tone-${bubble.tone}`}
+      onClick={() => onToggle(bubble.id)}
+      aria-pressed={active}
+      aria-expanded={active}
+    >
+      <span className="dashboard-bubble-label">{bubble.label}</span>
+      <strong className="dashboard-bubble-value">{bubble.value}</strong>
+      <span className="dashboard-bubble-meta">{bubble.meta}</span>
+    </button>
+  );
+}
+
+function DashboardBubbleDetail({ bubble, basePath }) {
+  if (!bubble) {
+    return null;
+  }
+
+  return (
+    <article className={`bubble-detail panel reveal tone-${bubble.tone}`}>
+      <div className="bubble-detail-head">
+        <span className="meta-label">{bubble.label}</span>
+        <h2>{bubble.detailTitle}</h2>
+        <p>{bubble.detailBody}</p>
+      </div>
+      <div className="bubble-detail-facts">
+        {bubble.facts.map((fact) => (
+          <article key={`${bubble.id}-${fact.label}`} className="bubble-fact">
+            <span className="meta-label">{fact.label}</span>
+            <strong>{fact.value}</strong>
+          </article>
+        ))}
+      </div>
+      <div className="tool-row bubble-detail-actions">
+        {bubble.actions.map((action) => (
+          <a
+            key={`${bubble.id}-${action.pageId}`}
+            className={action.className || "button-like"}
+            href={buildPageHref(basePath, action.pageId)}
+          >
+            {action.label}
+          </a>
+        ))}
+      </div>
+    </article>
   );
 }
 
@@ -967,6 +1022,7 @@ function App() {
     normalizeSetupState(readStorage(STORAGE_KEYS.setup, {}))
   );
   const [setupDraft, setSetupDraft] = useState(() => buildSetupDraft(profile));
+  const [activeDashboardBubbleId, setActiveDashboardBubbleId] = useState(null);
 
   const [draft, setDraft] = useState(defaultDraft);
   const [scenarioId, setScenarioId] = useState(scenarioDefinitions[0].id);
@@ -1218,6 +1274,7 @@ function App() {
     );
   }, [generatedSources.projectSync.projects]);
   const currentProjectSync = projectSyncMap.get("Applications/portfolio-site");
+  const leadProjectTrack = projectTracks[0] || null;
   const upcomingTimeline = courseTimeline
     .filter((item) => new Date(item.date).getTime() > now.getTime() - 7 * 86400000)
     .sort((a, b) => new Date(a.date) - new Date(b.date));
@@ -1981,7 +2038,138 @@ function App() {
         : "missing";
   const nextTimedItem = timedOpenItems[0] || null;
   const wakePlanCopy = buildWakePlanCopy(sleepModel, snapshotInfo.locale);
-  const coverageGapLabels = coverageGaps.map((area) => areaDefinitions[area].label).join(", ");
+  const academicOpenItems = openItems.filter((item) => item.area === "academic");
+  const workOpenItems = openItems.filter((item) => item.area === "work");
+  const socialOpenItems = openItems.filter((item) => ["social", "love"].includes(item.area));
+  const nextAcademicItem = academicOpenItems[0] || null;
+  const nextWorkItem = workOpenItems[0] || null;
+  const nextSocialItem = socialOpenItems[0] || null;
+  const savedBalance = profile.bankBalance?.trim() || "";
+
+  function buildBubbleTimeLabel(item) {
+    if (!item) {
+      return "Clear";
+    }
+
+    const value = item.viewDueAt || item.dueAt;
+    const diff = new Date(value).getTime() - now.getTime();
+    return diff >= 0 && diff <= 72 * 3600000
+      ? relativeWindow(value, now)
+      : formatShortDate(value, snapshotInfo.locale);
+  }
+
+  function truncateLabel(value, fallback) {
+    const text = String(value || "").trim();
+    if (!text) {
+      return fallback;
+    }
+
+    return text.length > 26 ? `${text.slice(0, 25)}…` : text;
+  }
+
+  const dashboardBubbles = [
+    {
+      id: "balance",
+      label: "Balance",
+      value: savedBalance || "Set",
+      meta: savedBalance ? "Manual total" : "Add in Systems",
+      tone: savedBalance ? "steady" : "missing",
+      detailTitle: savedBalance || "Balance not set",
+      detailBody: savedBalance
+        ? "Tracked manually in your profile."
+        : "Add your total bank balance in Systems.",
+      facts: [
+        { label: "State", value: savedBalance ? "Saved" : "Missing" },
+        { label: "Source", value: "Manual" },
+      ],
+      actions: [{ pageId: "systems", label: "Open Systems" }],
+    },
+    {
+      id: "academic",
+      label: "Academic",
+      value: nextAcademicItem ? buildBubbleTimeLabel(nextAcademicItem) : "Clear",
+      meta: nextAcademicItem ? truncateLabel(nextAcademicItem.title, "Open") : "No open item",
+      tone: nextAcademicItem?.hard ? "alert" : "steady",
+      detailTitle: nextAcademicItem ? nextAcademicItem.title : "Academic clear",
+      detailBody: nextAcademicItem
+        ? formatDateTime(nextAcademicItem.viewDueAt || nextAcademicItem.dueAt, snapshotInfo.locale)
+        : "No open academic item.",
+      facts: [
+        { label: "Open", value: String(academicOpenItems.length) },
+        { label: "Next", value: nextAcademicItem ? buildBubbleTimeLabel(nextAcademicItem) : "None" },
+      ],
+      actions: [
+        { pageId: "today", label: "Open Today" },
+        { pageId: "commitments", label: "Open Board", className: "button-like ghost" },
+      ],
+    },
+    {
+      id: "work",
+      label: "Work",
+      value: truncateLabel(nextWorkItem?.title || leadProjectTrack?.name, "Quiet"),
+      meta: nextWorkItem
+        ? buildBubbleTimeLabel(nextWorkItem)
+        : leadProjectTrack?.status || "No open item",
+      tone: nextWorkItem ? "steady" : "warm",
+      detailTitle: nextWorkItem?.title || leadProjectTrack?.name || "Work quiet",
+      detailBody: nextWorkItem
+        ? formatDateTime(nextWorkItem.viewDueAt || nextWorkItem.dueAt, snapshotInfo.locale)
+        : leadProjectTrack?.next || "No open work item.",
+      facts: [
+        { label: "Open", value: String(workOpenItems.length) },
+        { label: "Project", value: leadProjectTrack?.name || "None" },
+      ],
+      actions: [
+        { pageId: "projects", label: "Open Projects" },
+        { pageId: "commitments", label: "Open Board", className: "button-like ghost" },
+      ],
+    },
+    {
+      id: "social",
+      label: "Social",
+      value: nextSocialItem ? buildBubbleTimeLabel(nextSocialItem) : "Quiet",
+      meta: nextSocialItem
+        ? truncateLabel(nextSocialItem.title, "Plan")
+        : truncateLabel(areaNotes.social || areaNotes.love, "No plan logged"),
+      tone: nextSocialItem ? "future" : "warm",
+      detailTitle: nextSocialItem
+        ? nextSocialItem.title
+        : truncateLabel(areaNotes.social || areaNotes.love, "No social plan"),
+      detailBody: nextSocialItem
+        ? formatDateTime(nextSocialItem.viewDueAt || nextSocialItem.dueAt, snapshotInfo.locale)
+        : areaNotes.social || areaNotes.love || "No social or love plan is logged right now.",
+      facts: [
+        { label: "Plans", value: String(socialOpenItems.length) },
+        { label: "Next", value: nextSocialItem ? buildBubbleTimeLabel(nextSocialItem) : "None" },
+      ],
+      actions: [
+        { pageId: "areas", label: "Open Areas" },
+        { pageId: "commitments", label: "Open Board", className: "button-like ghost" },
+      ],
+    },
+    {
+      id: "sleep",
+      label: "Sleep",
+      value: formatTimeOnly(sleepModel.recommendedSleepAt, snapshotInfo.locale),
+      meta: wakePlanCopy.label,
+      tone: sleepModel.pastRecommendedSleep ? "alert" : "steady",
+      detailTitle: formatTimeOnly(sleepModel.recommendedSleepAt, snapshotInfo.locale),
+      detailBody: `Wake ${wakePlanCopy.label}. Wind down ${formatTimeOnly(
+        sleepModel.windDownAt,
+        snapshotInfo.locale
+      )}.`,
+      facts: [
+        { label: "Wake", value: wakePlanCopy.label },
+        { label: "Wind down", value: formatTimeOnly(sleepModel.windDownAt, snapshotInfo.locale) },
+      ],
+      actions: [
+        { pageId: "today", label: "Open Today" },
+        { pageId: "systems", label: "Open Systems", className: "button-like ghost" },
+      ],
+    },
+  ];
+  const activeDashboardBubble =
+    dashboardBubbles.find((bubble) => bubble.id === activeDashboardBubbleId) || null;
 
   function buildNavAction(pageId, label, className = "button-like") {
     return (
@@ -1995,104 +2183,21 @@ function App() {
     );
   }
 
-  const routeSummaries = {
-    today: {
-      detail: "Next move and sleep timing.",
-      meta: null,
-    },
-    calendar: {
-      detail: `${countLabel(calendarOccurrences.length, "occurrence")} in view.`,
-      meta: null,
-    },
-    commitments: {
-      detail: `${countLabel(openItems.length, "open commitment")} on the board.`,
-      meta: null,
-    },
-    search: {
-      detail: "Search notes, commitments, and journal.",
-      meta: null,
-    },
-    areas: {
-      detail: `${manualCoverageCount}/${areaOrder.length} life lanes filled.`,
-      meta: null,
-    },
-    systems: {
-      detail: "Imports, backups, and settings.",
-      meta: null,
-    },
-    projects: {
-      detail: `${countLabel(projectTracks.length, "project lane")} in view.`,
-      meta: null,
-    },
-  };
-
-  const dashboardHeroSection = (
-    <section className="hero panel reveal">
-      <div className="hero-copy">
-        <p className="eyebrow">Dashboard</p>
-        <h1>Know what matters now.</h1>
-        <p className="hero-text">
-          Check the next hard commitment, your sleep timing, and where to go next.
-        </p>
-        <div className="hero-controls">
-          <a
-            className="button-like"
-            href={buildPageHref(
-              pageContext.basePath,
-              setupState.profileReviewed ? "today" : "setup"
-            )}
-          >
-            {setupState.profileReviewed ? "Today" : "Setup"}
-          </a>
-          <a
-            className="button-like ghost"
-            href={buildPageHref(pageContext.basePath, "commitments")}
-          >
-            Commitments
-          </a>
-          <a className="button-like ghost" href={buildPageHref(pageContext.basePath, "systems")}>
-            Systems
-          </a>
-        </div>
+  const dashboardBubbleSection = (
+    <section className="dashboard-stage reveal">
+      <div className="bubble-board" aria-label="Dashboard bubbles">
+        {dashboardBubbles.map((bubble) => (
+          <DashboardBubbleButton
+            key={bubble.id}
+            bubble={bubble}
+            active={activeDashboardBubble?.id === bubble.id}
+            onToggle={(id) =>
+              setActiveDashboardBubbleId((current) => (current === id ? null : id))
+            }
+          />
+        ))}
       </div>
-
-      <div className="hero-status">
-        <div className={`verdict-card tone-${heroVerdict.tone}`}>
-          <p className="eyebrow">Right now</p>
-          <h2>{heroVerdict.title}</h2>
-          <p>{heroVerdict.summary}</p>
-          {nextTimedItem ? (
-            <p className="verdict-meta-line">
-              {formatDateTime(nextTimedItem.viewDueAt || nextTimedItem.dueAt, snapshotInfo.locale)}
-            </p>
-          ) : null}
-          <p className="move-line">
-            <strong>Move:</strong> {heroVerdict.move}
-          </p>
-        </div>
-
-        <div className="hero-meta-grid">
-          <div className="meta-card">
-            <span className="meta-label">Wake plan</span>
-            <strong>{wakePlanCopy.label}</strong>
-            <p>{wakePlanCopy.detail}</p>
-          </div>
-          <div className="meta-card">
-            <span className="meta-label">Target sleep</span>
-            <strong>{formatTimeOnly(sleepModel.recommendedSleepAt, snapshotInfo.locale)}</strong>
-            <p>Wind down by {formatTimeOnly(sleepModel.windDownAt, snapshotInfo.locale)}</p>
-          </div>
-          <div className="meta-card">
-            <span className="meta-label">Next timed item</span>
-            <strong>{nextTimedItem ? nextTimedItem.title : "Nothing timed yet"}</strong>
-            <p>
-              {nextTimedItem
-                ? formatDateTime(nextTimedItem.viewDueAt || nextTimedItem.dueAt, snapshotInfo.locale)
-                : "Use commitments or imports to fill the board."}
-            </p>
-          </div>
-        </div>
-      </div>
+      <DashboardBubbleDetail bubble={activeDashboardBubble} basePath={pageContext.basePath} />
     </section>
   );
 
@@ -2144,30 +2249,6 @@ function App() {
         </div>
       </div>
     </section>
-  );
-
-  const routeSection = (
-    <>
-      <PageIntro
-        eyebrow="Pages"
-        title="Open the page you need"
-        copy="Choose a page."
-      />
-      <section className="route-grid">
-        {pageLinks
-          .filter((link) => link.id !== "dashboard" && link.nav !== false)
-          .map((link) => (
-            <RouteCard
-              key={link.id}
-              href={link.href}
-              eyebrow={link.eyebrow}
-              title={link.title}
-              detail={routeSummaries[link.id]?.detail || link.copy}
-              meta={routeSummaries[link.id]?.meta || null}
-            />
-          ))}
-      </section>
-    </>
   );
 
   const setupPageSection = (
@@ -3156,6 +3237,15 @@ function App() {
           />
         </label>
         <label className="field-label">
+          Total bank balance
+          <input
+            name="bankBalance"
+            value={profile.bankBalance}
+            onChange={handleProfileChange}
+            placeholder="$0"
+          />
+        </label>
+        <label className="field-label">
           Default wake time
           <input
             name="wakeTime"
@@ -3662,12 +3752,22 @@ function App() {
     default:
       pageContent = (
         <>
-          {dashboardHeroSection}
-          {routeSection}
+          {dashboardBubbleSection}
         </>
       );
       break;
   }
+
+  const dashboardAction =
+    pageContext.pageId === "dashboard"
+      ? {
+          href: buildPageHref(
+            pageContext.basePath,
+            setupState.profileReviewed ? "today" : "setup"
+          ),
+          label: setupState.profileReviewed ? "Detailed pages" : "Finish setup",
+        }
+      : null;
 
   return (
     <div className="app-shell">
@@ -3677,6 +3777,7 @@ function App() {
           links={pageLinks}
           currentPageId={pageContext.pageId}
           basePath={pageContext.basePath}
+          dashboardAction={dashboardAction}
         />
         {flashMessage ? <p className={`flash global-flash tone-${flashMessage.tone}`}>{flashMessage.text}</p> : null}
         {pageContent}

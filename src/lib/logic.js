@@ -239,6 +239,12 @@ export function normalizeProfile(profile) {
       typeof next.displayName === "string" && next.displayName.trim()
         ? next.displayName
         : defaultProfileWithAutomation.displayName,
+    bankBalance:
+      typeof next.bankBalance === "string"
+        ? next.bankBalance.trim()
+        : typeof next.bankBalance === "number" && Number.isFinite(next.bankBalance)
+          ? String(next.bankBalance)
+          : defaultProfileWithAutomation.bankBalance,
     wakeTime:
       typeof next.wakeTime === "string" && next.wakeTime.includes(":")
         ? next.wakeTime
