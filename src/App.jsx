@@ -789,15 +789,10 @@ function countRoutineProgress(period, routineState, now) {
 
 function SiteNav({ links, currentPageId }) {
   return (
-    <header className="site-nav panel reveal">
+    <header className="site-nav reveal">
       <div className="nav-brand">
-        <span className="nav-mark" aria-hidden="true">
-          LC
-        </span>
-        <div className="nav-brand-copy">
-          <p className="eyebrow">Life Console</p>
-          <h1>Personal Dashboard</h1>
-        </div>
+        <p className="eyebrow">Personal dashboard</p>
+        <h1>Life Console</h1>
       </div>
       <nav className="nav-links" aria-label="Primary">
         {links.map((link) => (
@@ -817,7 +812,7 @@ function SiteNav({ links, currentPageId }) {
 
 function PageIntro({ eyebrow, title, copy, actions }) {
   return (
-    <section className="page-intro panel reveal">
+    <section className="page-intro reveal">
       <div className="page-intro-copy">
         <p className="eyebrow">{eyebrow}</p>
         <h2>{title}</h2>
@@ -1859,43 +1854,32 @@ function App() {
 
   const routeSummaries = {
     today: {
-      detail: heroVerdict.move,
-      meta:
-        next24Items.length > 0
-          ? `${countLabel(next24Items.length, "timed item")} inside the next 24 hours.`
-          : "No timed item inside the next 24 hours.",
+      detail: "Next move and sleep timing.",
+      meta: null,
     },
     calendar: {
-      detail: `${countLabel(calendarOccurrences.length, "occurrence")} render in the current ${calendarView} view.`,
-      meta: `Cursor anchored on ${formatDateOnly(calendarCursor, snapshotInfo.locale, true)}.`,
+      detail: `${countLabel(calendarOccurrences.length, "occurrence")} in view.`,
+      meta: null,
     },
     commitments: {
-      detail: `${countLabel(openItems.length, "open loop")} are visible across verified, synced, and local sources.`,
-      meta: `${countLabel(
-        archivedLocalItems.length + recurringHistory.length,
-        "recent completion"
-      )} already logged.`,
+      detail: `${countLabel(openItems.length, "open commitment")} on the board.`,
+      meta: null,
     },
     search: {
-      detail: "Search one place instead of guessing where you wrote something down.",
-      meta: `${countLabel(Object.keys(journalEntries).length, "journal day")} and your saved notes, commitments, and sources are indexed too.`,
+      detail: "Search notes, commitments, and journal.",
+      meta: null,
     },
     areas: {
-      detail: `${manualCoverageCount}/${areaOrder.length} major lanes already have manual coverage.`,
-      meta: coverageGapLabels
-        ? `Still blank: ${coverageGapLabels}.`
-        : "Every major lane has at least one note or commitment.",
+      detail: `${manualCoverageCount}/${areaOrder.length} life lanes filled.`,
+      meta: null,
     },
     systems: {
-      detail: `${countLabel(openSourceItemsCount, "imported item")} plus local sync, templates, and PWA install support.`,
-      meta: "Imports, backups, and profile tuning stay together on one operational page.",
+      detail: "Imports, backups, and settings.",
+      meta: null,
     },
     projects: {
-      detail: `${countLabel(projectTracks.length, "project lane")} are visible, with repo sync from this machine.`,
-      meta:
-        generatedSources.projectSync.projects.length > 0
-          ? `${countLabel(generatedSources.projectSync.projects.length, "repo")} were read on the last sync.`
-          : "No project sync snapshot loaded yet.",
+      detail: `${countLabel(projectTracks.length, "project lane")} in view.`,
+      meta: null,
     },
   };
 
@@ -1905,27 +1889,22 @@ function App() {
         <p className="eyebrow">Dashboard</p>
         <h1>Know what matters now.</h1>
         <p className="hero-text">
-          Life Console keeps the next hard commitment, your sleep timing, and the
-          right next page in one calm place. Start here, then go deeper only when
-          you need detail.
+          Check the next hard commitment, your sleep timing, and where to go next.
         </p>
         <div className="hero-controls">
           <a className="button-like" href={buildPageHref(pageContext.basePath, "today")}>
-            Open Today
+            Today
           </a>
           <a
             className="button-like ghost"
             href={buildPageHref(pageContext.basePath, "commitments")}
           >
-            Review Commitments
+            Commitments
           </a>
           <a className="button-like ghost" href={buildPageHref(pageContext.basePath, "systems")}>
-            Open Systems
+            Systems
           </a>
         </div>
-        <p className="hero-footnote">
-          Your data stays local to this browser unless you export it or enable sync.
-        </p>
       </div>
 
       <div className="hero-status">
@@ -1933,11 +1912,11 @@ function App() {
           <p className="eyebrow">Right now</p>
           <h2>{heroVerdict.title}</h2>
           <p>{heroVerdict.summary}</p>
-          <ul className="bullet-list">
-            {heroVerdict.bullets.map((bullet) => (
-              <li key={bullet}>{bullet}</li>
-            ))}
-          </ul>
+          {nextTimedItem ? (
+            <p className="verdict-meta-line">
+              {formatDateTime(nextTimedItem.viewDueAt || nextTimedItem.dueAt, snapshotInfo.locale)}
+            </p>
+          ) : null}
           <p className="move-line">
             <strong>Move:</strong> {heroVerdict.move}
           </p>
@@ -2022,8 +2001,8 @@ function App() {
     <>
       <PageIntro
         eyebrow="Pages"
-        title="Go deeper only when you need to"
-        copy="Each page is focused, calmer to scan, and better than burying everything inside one long dashboard."
+        title="Open the page you need"
+        copy="Choose a page."
       />
       <section className="route-grid">
         {pageLinks
@@ -2035,7 +2014,7 @@ function App() {
               eyebrow={link.eyebrow}
               title={link.title}
               detail={routeSummaries[link.id]?.detail || link.copy}
-              meta={routeSummaries[link.id]?.meta || link.copy}
+              meta={routeSummaries[link.id]?.meta || null}
             />
           ))}
       </section>
