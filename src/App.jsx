@@ -791,8 +791,13 @@ function SiteNav({ links, currentPageId }) {
   return (
     <header className="site-nav panel reveal">
       <div className="nav-brand">
-        <p className="eyebrow">Life Console</p>
-        <h1>Dashboard for doubt</h1>
+        <span className="nav-mark" aria-hidden="true">
+          LC
+        </span>
+        <div className="nav-brand-copy">
+          <p className="eyebrow">Life Console</p>
+          <h1>Personal Dashboard</h1>
+        </div>
       </div>
       <nav className="nav-links" aria-label="Primary">
         {links.map((link) => (
@@ -800,6 +805,7 @@ function SiteNav({ links, currentPageId }) {
             key={link.id}
             href={link.href}
             className={`nav-link ${currentPageId === link.id ? "is-active" : ""}`}
+            aria-current={currentPageId === link.id ? "page" : undefined}
           >
             {link.label}
           </a>
@@ -1898,44 +1904,30 @@ function App() {
   const dashboardHeroSection = (
     <section className="hero panel reveal">
       <div className="hero-copy">
-        <p className="eyebrow">Life Console</p>
-        <h1>A dashboard for doubt.</h1>
+        <p className="eyebrow">Dashboard</p>
+        <h1>Know what matters now.</h1>
         <p className="hero-text">
-          The home page stays intentionally light: what matters now, when to sleep,
-          and where to go next. The detail lives on the deeper pages.
+          Life Console keeps the next hard commitment, your sleep timing, and the
+          right next page in one calm place. Start here, then go deeper only when
+          you need detail.
         </p>
-        <div className="hero-tags">
-          <span className="tag">Clear home</span>
-          <span className="tag">Detailed pages</span>
-          <span className="tag">Bookmarkable</span>
-        </div>
         <div className="hero-controls">
-          <a className="button-like ghost" href={buildPageHref(pageContext.basePath, "today")}>
-            Open today
+          <a className="button-like" href={buildPageHref(pageContext.basePath, "today")}>
+            Open Today
           </a>
           <a
             className="button-like ghost"
             href={buildPageHref(pageContext.basePath, "commitments")}
           >
-            Open commitments
+            Review Commitments
           </a>
           <a className="button-like ghost" href={buildPageHref(pageContext.basePath, "systems")}>
-            Open systems
+            Open Systems
           </a>
-          {installPromptEvent ? (
-            <button type="button" className="ghost" onClick={promptInstall}>
-              Install app
-            </button>
-          ) : notificationPermission !== "granted" ? (
-            <button type="button" className="ghost" onClick={requestNotifications}>
-              Enable reminders
-            </button>
-          ) : (
-            <button type="button" className="ghost" onClick={exportSnapshot}>
-              Export snapshot
-            </button>
-          )}
         </div>
+        <p className="hero-footnote">
+          Your data stays local to this browser unless you export it or enable sync.
+        </p>
       </div>
 
       <div className="hero-status">
@@ -2032,8 +2024,8 @@ function App() {
     <>
       <PageIntro
         eyebrow="Pages"
-        title="Open the lane you actually need"
-        copy="The root dashboard stays brief. Use these direct pages when you need depth instead of more scrolling."
+        title="Go deeper only when you need to"
+        copy="Each page is focused, calmer to scan, and better than burying everything inside one long dashboard."
       />
       <section className="route-grid">
         {pageLinks
