@@ -1,0 +1,4 @@
+title,area,dueAt,note,priority,hard,durationMinutes,recurrence,recurrenceInterval
+Lab writeup draft,academic,2026-03-12 19:00,Bring draft to office hours,high,true,90,none,1
+Dinner with friends,social,2026-03-10 18:30,Do not stay up late if this is tomorrow,normal,false,120,none,1
+Weekly board reset,future,2026-03-15 20:00,Clean the dashboard before Monday,normal,false,45,weekly,1

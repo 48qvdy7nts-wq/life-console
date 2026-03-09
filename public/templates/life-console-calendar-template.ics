@@ -1,0 +1,18 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Life Console//Import Template//EN
+BEGIN:VEVENT
+UID:life-console-social-1
+DTSTART:20260310T183000
+SUMMARY:Dinner with friends
+DESCRIPTION:Log this so the dashboard knows tomorrow has a human plan.
+CATEGORIES:SOCIAL
+END:VEVENT
+BEGIN:VTODO
+UID:life-console-academic-1
+DUE:20260312T190000
+SUMMARY:Finish lab writeup draft
+DESCRIPTION:High-priority academic item.
+CATEGORIES:ACADEMIC
+END:VTODO
+END:VCALENDAR

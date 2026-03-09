@@ -1,0 +1,22 @@
+{
+  "name": "Life Console",
+  "short_name": "Life Console",
+  "description": "A local-first life dashboard for commitments, routines, notes, and decision support.",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#08121c",
+  "theme_color": "#08121c",
+  "icons": [
+    {
+      "src": "./icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "./icons/maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}

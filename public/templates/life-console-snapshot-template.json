@@ -1,0 +1,26 @@
+{
+  "version": 3,
+  "exportedAt": "2026-03-09T00:00:00.000Z",
+  "profile": {
+    "displayName": "Syeve",
+    "wakeTime": "09:00",
+    "sleepTargetHours": 8,
+    "windDownMinutes": 45,
+    "gamingCutoff": "00:30",
+    "focusBlockMinutes": 60,
+    "notificationLeadMinutes": 30
+  },
+  "customItems": [],
+  "areaNotes": {
+    "academic": "",
+    "work": "",
+    "social": "",
+    "love": "",
+    "hobbies": "",
+    "future": ""
+  },
+  "principles": [],
+  "routineState": {},
+  "dismissedVerifiedIds": [],
+  "journalEntries": {}
+}

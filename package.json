@@ -4,7 +4,12 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "sync:apple": "node scripts/sync_apple.mjs",
+    "sync:local": "node scripts/scan_local_sources.mjs",
+    "sync:projects": "node scripts/sync_projects.mjs",
+    "sync:all": "npm run sync:apple && npm run sync:local && npm run sync:projects",
     "build": "vite build",
+    "build:all": "npm run sync:all && npm run build",
     "preview": "vite preview"
   },
   "dependencies": {
