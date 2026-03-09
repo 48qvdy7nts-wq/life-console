@@ -150,8 +150,63 @@ export function getCutoffBoundary(now, cutoffTime) {
   return cutoff;
 }
 
-export function buildSleepModel(now, profile) {
-  const upcomingWake = getUpcomingWake(now, profile.wakeTime);
+function buildWakeTiming(now, profile, items) {
+  const baselineWake = getUpcomingWake(now, profile.wakeTime);
+  const idealReadyMinutes = toPositiveNumber(
+    profile.idealReadyMinutes,
+    defaultProfileWithAutomation.idealReadyMinutes
+  );
+  const latestReadyMinutes = toPositiveNumber(
+    profile.latestReadyMinutes,
+    defaultProfileWithAutomation.latestReadyMinutes
+  );
+  const wakeDayStart = startOfDay(baselineWake);
+  const wakeDayEnd = endOfDay(baselineWake);
+
+  const wakeDrivenItem = (Array.isArray(items) ? items : [])
+    .filter((item) => item?.viewDueAt || item?.dueAt)
+    .map((item) => ({
+      item,
+      dueAt: new Date(item.viewDueAt || item.dueAt),
+    }))
+    .filter(
+      ({ dueAt }) =>
+        dueAt.getTime() >= wakeDayStart.getTime() &&
+        dueAt.getTime() <= wakeDayEnd.getTime()
+    )
+    .map(({ item, dueAt }) => ({
+      item,
+      dueAt,
+      idealWake: new Date(dueAt.getTime() - idealReadyMinutes * 60000),
+      latestWake: new Date(dueAt.getTime() - latestReadyMinutes * 60000),
+    }))
+    .filter(({ idealWake }) => idealWake.getTime() < baselineWake.getTime())
+    .sort((a, b) => a.idealWake.getTime() - b.idealWake.getTime())[0];
+
+  if (!wakeDrivenItem) {
+    return {
+      wakeMode: "baseline",
+      baselineWake,
+      idealWake: baselineWake,
+      latestWake: baselineWake,
+      wakeSourceItem: null,
+      wakeSourceDueAt: null,
+    };
+  }
+
+  return {
+    wakeMode: "event",
+    baselineWake,
+    idealWake: wakeDrivenItem.idealWake,
+    latestWake: wakeDrivenItem.latestWake,
+    wakeSourceItem: wakeDrivenItem.item,
+    wakeSourceDueAt: wakeDrivenItem.dueAt.toISOString(),
+  };
+}
+
+export function buildSleepModel(now, profile, items = []) {
+  const wakeTiming = buildWakeTiming(now, profile, items);
+  const upcomingWake = wakeTiming.idealWake;
   const recommendedSleepAt = new Date(
     upcomingWake.getTime() - toPositiveNumber(profile.sleepTargetHours, 8) * 3600000
   );
@@ -162,11 +217,13 @@ export function buildSleepModel(now, profile) {
   const cutoffAt = getCutoffBoundary(now, profile.gamingCutoff);
 
   return {
+    ...wakeTiming,
     upcomingWake,
     recommendedSleepAt,
     windDownAt,
     cutoffAt,
     hoursUntilWake: (upcomingWake.getTime() - now.getTime()) / 3600000,
+    hoursUntilLatestWake: (wakeTiming.latestWake.getTime() - now.getTime()) / 3600000,
     hoursUntilSleep: (recommendedSleepAt.getTime() - now.getTime()) / 3600000,
     inWindDown: now.getTime() >= windDownAt.getTime(),
     pastRecommendedSleep: now.getTime() >= recommendedSleepAt.getTime(),
@@ -186,6 +243,14 @@ export function normalizeProfile(profile) {
       typeof next.wakeTime === "string" && next.wakeTime.includes(":")
         ? next.wakeTime
         : defaultProfileWithAutomation.wakeTime,
+    latestReadyMinutes: toPositiveNumber(
+      next.latestReadyMinutes,
+      defaultProfileWithAutomation.latestReadyMinutes
+    ),
+    idealReadyMinutes: toPositiveNumber(
+      next.idealReadyMinutes,
+      defaultProfileWithAutomation.idealReadyMinutes
+    ),
     sleepTargetHours: toPositiveNumber(
       next.sleepTargetHours,
       defaultProfileWithAutomation.sleepTargetHours

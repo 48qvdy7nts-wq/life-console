@@ -386,6 +386,8 @@ export const routineTemplates = [
 export const defaultProfile = {
   displayName: "Syeve",
   wakeTime: "09:00",
+  latestReadyMinutes: 30,
+  idealReadyMinutes: 60,
   sleepTargetHours: 8,
   windDownMinutes: 45,
   gamingCutoff: "00:30",

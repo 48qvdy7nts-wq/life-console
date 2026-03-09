@@ -221,6 +221,23 @@ function toDateTimeLocalValue(date) {
   return `${year}-${month}-${day}T${hours}:${minutes}`;
 }
 
+function buildWakePlanCopy(sleepModel, locale) {
+  if (sleepModel.wakeMode === "event" && sleepModel.wakeSourceItem) {
+    return {
+      label: `${formatTimeOnly(sleepModel.upcomingWake, locale)} ideal`,
+      detail: `${formatTimeOnly(
+        sleepModel.latestWake,
+        locale
+      )} latest for ${sleepModel.wakeSourceItem.title}.`,
+    };
+  }
+
+  return {
+    label: formatTimeOnly(sleepModel.upcomingWake, locale),
+    detail: "Using your default wake time because nothing earlier on that day forces it.",
+  };
+}
+
 function readStorage(key, fallback) {
   if (typeof window === "undefined") {
     return fallback;
@@ -393,10 +410,17 @@ function buildScenarioDecision({
         bullets: [
           upcoming12h.some((item) => item.hard)
             ? `There is a hard item inside the next 12 hours: ${upcoming12h[0].title}.`
-            : `You are already inside or past the target sleep window for a ${formatTimeOnly(
-                sleepModel.upcomingWake,
-                locale
-              )} wake-up.`,
+            : sleepModel.wakeMode === "event" && sleepModel.wakeSourceItem
+              ? `You are already inside or past the target sleep window for a ${formatTimeOnly(
+                  sleepModel.upcomingWake,
+                  locale
+                )} ideal wake (${formatTimeOnly(sleepModel.latestWake, locale)} latest) for ${
+                  sleepModel.wakeSourceItem.title
+                }.`
+              : `You are already inside or past the target sleep window for a ${formatTimeOnly(
+                  sleepModel.upcomingWake,
+                  locale
+                )} wake-up.`,
           `Recommended asleep time is ${formatTimeOnly(
             sleepModel.recommendedSleepAt,
             locale
@@ -449,7 +473,14 @@ function buildScenarioDecision({
         summary:
           "A tired extra block usually creates worse work and a weaker tomorrow.",
         bullets: [
-          `Upcoming wake time: ${formatTimeOnly(sleepModel.upcomingWake, locale)}.`,
+          sleepModel.wakeMode === "event" && sleepModel.wakeSourceItem
+            ? `Wake plan: ${formatTimeOnly(
+                sleepModel.upcomingWake,
+                locale
+              )} ideal, ${formatTimeOnly(sleepModel.latestWake, locale)} latest for ${
+                sleepModel.wakeSourceItem.title
+              }.`
+            : `Upcoming wake time: ${formatTimeOnly(sleepModel.upcomingWake, locale)}.`,
           `Target sleep budget: ${profile.sleepTargetHours} hours.`,
           "You are already trading tomorrow's sharpness for marginal progress.",
         ],
@@ -592,7 +623,14 @@ function buildHeroVerdict({ now, openItems, sleepModel, profile, locale }) {
       "That means the right default is deliberate project work or recovery, not low-grade drift.",
     bullets: [
       "No hard commitment is currently visible in the next day.",
-      `Wake time is set to ${profile.wakeTime}.`,
+      sleepModel.wakeMode === "event" && sleepModel.wakeSourceItem
+        ? `Wake ${formatTimeOnly(
+            sleepModel.upcomingWake,
+            locale
+          )} ideal, ${formatTimeOnly(sleepModel.latestWake, locale)} latest for ${
+            sleepModel.wakeSourceItem.title
+          }.`
+        : `Default wake is ${formatTimeOnly(sleepModel.upcomingWake, locale)}.`,
       "When the board is quiet, move the clearest real project forward.",
     ],
     move: "Use the open space on purpose.",
@@ -870,7 +908,6 @@ function App() {
   );
 
   const [draft, setDraft] = useState(defaultDraft);
-  const [principleDraft, setPrincipleDraft] = useState("");
   const [scenarioId, setScenarioId] = useState(scenarioDefinitions[0].id);
   const [filterArea, setFilterArea] = useState("all");
   const [flashMessage, setFlashMessage] = useState(null);
@@ -1048,7 +1085,18 @@ function App() {
     [openItems, filterArea]
   );
 
-  const sleepModel = useMemo(() => buildSleepModel(now, profile), [now, profile]);
+  const timedOpenItems = useMemo(
+    () =>
+      openItems
+        .filter((item) => item.viewDueAt || item.dueAt)
+        .sort(itemSort),
+    [openItems]
+  );
+
+  const sleepModel = useMemo(
+    () => buildSleepModel(now, profile, timedOpenItems),
+    [now, profile, timedOpenItems]
+  );
   const heroVerdict = useMemo(
     () =>
       buildHeroVerdict({
@@ -1081,14 +1129,6 @@ function App() {
     [now, openItems, routineState, sleepModel]
   );
 
-  const timedOpenItems = useMemo(
-    () =>
-      openItems
-        .filter((item) => item.viewDueAt || item.dueAt)
-        .sort(itemSort),
-    [openItems]
-  );
-
   const pastDueItems = timedOpenItems.filter(
     (item) => new Date(item.viewDueAt || item.dueAt).getTime() < now.getTime()
   );
@@ -1117,15 +1157,6 @@ function App() {
     );
   }, [generatedSources.projectSync.projects]);
   const currentProjectSync = projectSyncMap.get("Applications/portfolio-site");
-  const liveLabel = new Intl.DateTimeFormat(snapshotInfo.locale, {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    timeZoneName: "short",
-  }).format(now);
   const upcomingTimeline = courseTimeline
     .filter((item) => new Date(item.date).getTime() > now.getTime() - 7 * 86400000)
     .sort((a, b) => new Date(a.date) - new Date(b.date));
@@ -1559,6 +1590,8 @@ function App() {
         ...current,
         [name]:
           [
+            "latestReadyMinutes",
+            "idealReadyMinutes",
             "sleepTargetHours",
             "windDownMinutes",
             "focusBlockMinutes",
@@ -1584,26 +1617,6 @@ function App() {
         [key]: new Date().toISOString(),
       };
     });
-  }
-
-  function handleAddPrinciple(event) {
-    event.preventDefault();
-    if (!principleDraft.trim()) {
-      return;
-    }
-
-    setPrinciples((current) => [
-      {
-        id: createId("principle"),
-        text: principleDraft.trim(),
-      },
-      ...current,
-    ]);
-    setPrincipleDraft("");
-  }
-
-  function removePrinciple(id) {
-    setPrinciples((current) => current.filter((principle) => principle.id !== id));
   }
 
   function updateJournalField(name, value) {
@@ -1823,6 +1836,7 @@ function App() {
         : "missing";
   const countLabel = (count, noun) => `${count} ${noun}${count === 1 ? "" : "s"}`;
   const nextTimedItem = timedOpenItems[0] || null;
+  const wakePlanCopy = buildWakePlanCopy(sleepModel, snapshotInfo.locale);
   const coverageGapLabels = coverageGaps.map((area) => areaDefinitions[area].label).join(", ");
 
   function buildNavAction(pageId, label, className = "button-like") {
@@ -1858,10 +1872,7 @@ function App() {
     },
     search: {
       detail: "Search one place instead of guessing where you wrote something down.",
-      meta: `${countLabel(Object.keys(journalEntries).length, "journal day")} and ${countLabel(
-        principles.length,
-        "principle"
-      )} are indexed too.`,
+      meta: `${countLabel(Object.keys(journalEntries).length, "journal day")} and your saved notes, commitments, and sources are indexed too.`,
     },
     areas: {
       detail: `${manualCoverageCount}/${areaOrder.length} major lanes already have manual coverage.`,
@@ -1890,28 +1901,24 @@ function App() {
         <p className="eyebrow">Life Console</p>
         <h1>A dashboard for doubt.</h1>
         <p className="hero-text">
-          This is now a real multi-page website for your life, with direct URLs like
-          `/today` and `/projects` instead of one long scroll. The root page stays
-          compact, then each lane goes deeper when you need it.
+          The home page stays intentionally light: what matters now, when to sleep,
+          and where to go next. The detail lives on the deeper pages.
         </p>
         <div className="hero-tags">
-          <span className="tag">Bookmarkable pages</span>
-          <span className="tag">Recurring items</span>
-          <span className="tag">Week and month view</span>
-          <span className="tag">PWA ready</span>
+          <span className="tag">Clear home</span>
+          <span className="tag">Detailed pages</span>
+          <span className="tag">Bookmarkable</span>
         </div>
         <div className="hero-controls">
           <a className="button-like ghost" href={buildPageHref(pageContext.basePath, "today")}>
             Open today
           </a>
-          <button type="button" className="ghost" onClick={exportSnapshot}>
-            Export snapshot
-          </button>
-          <button type="button" className="ghost" onClick={requestNotifications}>
-            {notificationPermission === "granted"
-              ? "Notifications enabled"
-              : "Enable reminders"}
-          </button>
+          <a
+            className="button-like ghost"
+            href={buildPageHref(pageContext.basePath, "commitments")}
+          >
+            Open commitments
+          </a>
           <a className="button-like ghost" href={buildPageHref(pageContext.basePath, "systems")}>
             Open systems
           </a>
@@ -1919,7 +1926,15 @@ function App() {
             <button type="button" className="ghost" onClick={promptInstall}>
               Install app
             </button>
-          ) : null}
+          ) : notificationPermission !== "granted" ? (
+            <button type="button" className="ghost" onClick={requestNotifications}>
+              Enable reminders
+            </button>
+          ) : (
+            <button type="button" className="ghost" onClick={exportSnapshot}>
+              Export snapshot
+            </button>
+          )}
         </div>
       </div>
 
@@ -1940,18 +1955,23 @@ function App() {
 
         <div className="hero-meta-grid">
           <div className="meta-card">
-            <span className="meta-label">Live clock</span>
-            <strong>{liveLabel}</strong>
+            <span className="meta-label">Wake plan</span>
+            <strong>{wakePlanCopy.label}</strong>
+            <p>{wakePlanCopy.detail}</p>
           </div>
           <div className="meta-card">
             <span className="meta-label">Target sleep</span>
             <strong>{formatTimeOnly(sleepModel.recommendedSleepAt, snapshotInfo.locale)}</strong>
-            <p>Wake at {profile.wakeTime}</p>
+            <p>Wind down by {formatTimeOnly(sleepModel.windDownAt, snapshotInfo.locale)}</p>
           </div>
           <div className="meta-card">
-            <span className="meta-label">Last source check</span>
-            <strong>{formatDateTime(snapshotInfo.lastVerifiedAt, snapshotInfo.locale, true)}</strong>
-            <p>{snapshotInfo.timezone}</p>
+            <span className="meta-label">Next timed item</span>
+            <strong>{nextTimedItem ? nextTimedItem.title : "Nothing timed yet"}</strong>
+            <p>
+              {nextTimedItem
+                ? formatDateTime(nextTimedItem.viewDueAt || nextTimedItem.dueAt, snapshotInfo.locale)
+                : "Use commitments or imports to fill the board."}
+            </p>
           </div>
         </div>
       </div>
@@ -1980,8 +2000,9 @@ function App() {
         </p>
         <div className="hero-meta-grid">
           <div className="meta-card">
-            <span className="meta-label">Live clock</span>
-            <strong>{liveLabel}</strong>
+            <span className="meta-label">Wake plan</span>
+            <strong>{wakePlanCopy.label}</strong>
+            <p>{wakePlanCopy.detail}</p>
           </div>
           <div className="meta-card">
             <span className="meta-label">Next timed item</span>
@@ -1995,7 +2016,7 @@ function App() {
           <div className="meta-card">
             <span className="meta-label">Target sleep</span>
             <strong>{formatTimeOnly(sleepModel.recommendedSleepAt, snapshotInfo.locale)}</strong>
-            <p>Wake at {profile.wakeTime}</p>
+            <p>Wind down by {formatTimeOnly(sleepModel.windDownAt, snapshotInfo.locale)}</p>
           </div>
           <div className="meta-card">
             <span className="meta-label">Human plans 72h</span>
@@ -2004,68 +2025,6 @@ function App() {
           </div>
         </div>
       </div>
-    </section>
-  );
-
-  const metricsSection = (
-    <section className="metric-grid">
-      <MetricCard
-        label="Open loops"
-        value={String(openItems.length)}
-        detail="All visible commitments across local, verified, Apple, and scan sources."
-        tone={openItems.length > 0 ? "steady" : "future"}
-      />
-      <MetricCard
-        label="Due in 24h"
-        value={String(next24Items.length)}
-        detail="Anything inside the next day should shape tonight."
-        tone={next24Items.length > 0 ? "alert" : "steady"}
-      />
-      <MetricCard
-        label="Manual coverage"
-        value={`${manualCoverageCount}/${areaOrder.length}`}
-        detail="Areas with at least a note or a local commitment."
-        tone={manualCoverageCount >= 3 ? "future" : "warm"}
-      />
-      <MetricCard
-        label="Synced sources"
-        value={String(openSourceItemsCount)}
-        detail="Apple and local-scan items currently feeding the board."
-        tone={openSourceItemsCount > 0 ? "steady" : "missing"}
-      />
-    </section>
-  );
-
-  const reviewSection = (
-    <section className="review-grid">
-      <ReviewPanel
-        eyebrow="Night reset"
-        title="Daily review"
-        summary={dailyReview.summary}
-        stats={dailyReview.stats}
-        bullets={dailyReview.bullets}
-        action={dailyReview.action}
-        tone="alert"
-      />
-      <ReviewPanel
-        eyebrow="Board reset"
-        title="Weekly review"
-        summary={weeklyReview.summary}
-        stats={weeklyReview.stats}
-        bullets={weeklyReview.bullets}
-        action={weeklyReview.action}
-        tone="future"
-      />
-      <ReviewPanel
-        eyebrow="Setup"
-        title="Zero-cost shipping"
-        summary={setupReview.summary}
-        stats={setupReview.stats}
-        bullets={setupReview.bullets}
-        action={setupReview.action}
-        footer={setupReview.footer}
-        tone="steady"
-      />
     </section>
   );
 
@@ -2210,7 +2169,7 @@ function App() {
       <div className="panel-pad">
         <div className="radar-meta">
           <div>
-            <span className="meta-label">Wake</span>
+            <span className="meta-label">Ideal wake</span>
             <strong>{formatTimeOnly(sleepModel.upcomingWake, snapshotInfo.locale)}</strong>
           </div>
           <div>
@@ -2961,7 +2920,7 @@ function App() {
       <SectionHeading
         eyebrow="Profile"
         title="Tune the decision engine"
-        copy="These settings drive sleep logic, reminders, and the default shape of work blocks."
+        copy="Wake can now be driven by tomorrow's earliest real commitment. Your default wake still matters when nothing earlier forces it."
       />
       <div className="profile-grid">
         <label className="field-label">
@@ -2973,11 +2932,33 @@ function App() {
           />
         </label>
         <label className="field-label">
-          Wake time
+          Default wake time
           <input
             name="wakeTime"
             type="time"
             value={profile.wakeTime}
+            onChange={handleProfileChange}
+          />
+        </label>
+        <label className="field-label">
+          Latest-ready minutes
+          <input
+            name="latestReadyMinutes"
+            type="number"
+            min="0"
+            step="5"
+            value={profile.latestReadyMinutes}
+            onChange={handleProfileChange}
+          />
+        </label>
+        <label className="field-label">
+          Ideal-ready minutes
+          <input
+            name="idealReadyMinutes"
+            type="number"
+            min="0"
+            step="5"
+            value={profile.idealReadyMinutes}
             onChange={handleProfileChange}
           />
         </label>
@@ -3036,37 +3017,23 @@ function App() {
           />
         </label>
       </div>
+      <div className="panel-pad">
+        <p className="small-copy">
+          Example: if class starts at 9:30 AM, setting `Latest-ready` to 30 and `Ideal-ready`
+          to 60 makes the wake plan aim for 8:30 AM ideal and 9:00 AM latest.
+        </p>
+      </div>
     </article>
   );
 
-  const principlesSyncPanel = (
+  const syncPanel = (
     <article className="panel reveal">
       <SectionHeading
-        eyebrow="Principles and sync"
-        title="Rules you want future-you to respect"
-        copy="Principles make the app feel like your own voice. Sync keeps that voice portable."
+        eyebrow="Backups and sync"
+        title="Import, export, and keep it portable"
+        copy="This is the practical layer for restoring, moving, and syncing your board across devices."
       />
       <div className="panel-pad">
-        <form className="principle-form" onSubmit={handleAddPrinciple}>
-          <input
-            type="text"
-            value={principleDraft}
-            onChange={(event) => setPrincipleDraft(event.target.value)}
-            placeholder="Add a rule you want future-you to respect"
-          />
-          <button type="submit">Add</button>
-        </form>
-        <div className="principles-list">
-          {principles.map((principle) => (
-            <article key={principle.id} className="principle-card">
-              <p>{principle.text}</p>
-              <button type="button" className="ghost" onClick={() => removePrinciple(principle.id)}>
-                Remove
-              </button>
-            </article>
-          ))}
-        </div>
-
         <div className="section-break">
           <div className="inline-heading">
             <h3>Import and free cloud sync</h3>
@@ -3446,7 +3413,7 @@ function App() {
           {sourcesPanel}
           <section className="systems-grid">
             {profilePanel}
-            {principlesSyncPanel}
+            {syncPanel}
           </section>
         </>
       );
@@ -3469,11 +3436,7 @@ function App() {
       pageContent = (
         <>
           {dashboardHeroSection}
-          {metricsSection}
-          {setupGuidePanel}
           {routeSection}
-          {areaSummarySection}
-          {reviewSection}
         </>
       );
       break;
