@@ -1888,9 +1888,7 @@ function App() {
     },
     systems: {
       detail: `${countLabel(openSourceItemsCount, "imported item")} plus local sync, templates, and PWA install support.`,
-      meta: currentProjectSync?.hasRemote
-        ? "Repo remote exists, so public hosting is now an account-side step."
-        : "Pages workflow is ready, but this repo still has no remote configured.",
+      meta: "Imports, backups, and profile tuning stay together on one operational page.",
     },
     projects: {
       detail: `${countLabel(projectTracks.length, "project lane")} are visible, with repo sync from this machine.`,
