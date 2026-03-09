@@ -158,6 +158,15 @@ const PAGE_DEFINITIONS = [
   },
 ];
 
+const SETUP_AREA_OPTIONS = [
+  { value: "academic", label: "School" },
+  { value: "work", label: "Work" },
+  { value: "social", label: "Social" },
+  { value: "love", label: "Love" },
+  { value: "hobbies", label: "Hobby" },
+  { value: "future", label: "Future" },
+];
+
 function normalizePathSegments(pathname) {
   const segments = String(pathname || "/")
     .split("/")
@@ -829,7 +838,6 @@ function SiteNav({ links, currentPageId, basePath }) {
     return (
       <header className="site-nav reveal is-setup">
         <div className="nav-brand">
-          <p className="eyebrow">Personal dashboard</p>
           <h1>Life Console</h1>
         </div>
         <a className="mini-text-button" href={buildPageHref(basePath, "dashboard")}>
@@ -2165,23 +2173,14 @@ function App() {
   const setupPageSection = (
     <section className="setup-shell reveal">
       <div className="setup-copy">
-        <p className="eyebrow">Quick setup</p>
-        <h1>Make the board yours.</h1>
-        <p className="section-copy">
-          Start with the basics: when you usually wake up, how much time you want before something timed, and the next real thing coming up.
-        </p>
-        <p className="setup-support">Everything here can be changed later in Systems, Areas, and Commitments.</p>
+        <h1>Make it yours.</h1>
+        <p className="setup-support">Change everything later.</p>
       </div>
 
       <form className="panel setup-form-card" onSubmit={handleSetupSubmit}>
         <div className="panel-pad setup-form-stack">
           <section className="setup-section-block">
-            <div className="inline-heading">
-              <div>
-                <span className="meta-label">Basics</span>
-                <h3>Who you are</h3>
-              </div>
-            </div>
+            <p className="setup-section-label">You</p>
             <div className="form-row">
               <label className="field-label">
                 Name
@@ -2190,11 +2189,11 @@ function App() {
                   name="displayName"
                   value={setupDraft.displayName}
                   onChange={handleSetupDraftChange}
-                  placeholder="Your name"
+                  placeholder="Name"
                 />
               </label>
               <label className="field-label">
-                Default wake time
+                Wake time
                 <input
                   type="time"
                   name="wakeTime"
@@ -2203,18 +2202,9 @@ function App() {
                 />
               </label>
             </div>
-          </section>
-
-          <section className="setup-section-block">
-            <div className="inline-heading">
-              <div>
-                <span className="meta-label">Timing</span>
-                <h3>Mornings</h3>
-              </div>
-            </div>
             <div className="form-row">
               <label className="field-label">
-                Minutes you want before a class or date
+                Buffer before plans
                 <input
                   type="number"
                   min="0"
@@ -2222,12 +2212,9 @@ function App() {
                   value={setupDraft.morningBufferMinutes}
                   onChange={handleSetupDraftChange}
                 />
-                <span className="field-hint">
-                  Example: 60 means a 9:30 start aims for an 8:30 wake-up.
-                </span>
               </label>
               <label className="field-label">
-                Sleep target (hours)
+                Sleep hours
                 <input
                   type="number"
                   min="1"
@@ -2240,38 +2227,17 @@ function App() {
           </section>
 
           <section className="setup-section-block">
-            <div className="inline-heading">
-              <div>
-                <span className="meta-label">Next</span>
-                <h3>Next important thing</h3>
-              </div>
-            </div>
-            <div className="form-row">
-              <label className="field-label">
-                Title
-                <input
-                  type="text"
-                  name="firstCommitmentTitle"
-                  value={setupDraft.firstCommitmentTitle}
-                  onChange={handleSetupDraftChange}
-                  placeholder="Tomorrow's class, a date, an assignment, a call"
-                />
-              </label>
-              <label className="field-label">
-                Area
-                <select
-                  name="firstCommitmentArea"
-                  value={setupDraft.firstCommitmentArea}
-                  onChange={handleSetupDraftChange}
-                >
-                  {areaOrder.map((area) => (
-                    <option key={area} value={area}>
-                      {areaDefinitions[area].label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
+            <p className="setup-section-label">Next thing</p>
+            <label className="field-label">
+              Title
+              <input
+                type="text"
+                name="firstCommitmentTitle"
+                value={setupDraft.firstCommitmentTitle}
+                onChange={handleSetupDraftChange}
+                placeholder="Class, date, assignment"
+              />
+            </label>
             <div className="form-row">
               <label className="field-label">
                 When
@@ -2282,30 +2248,27 @@ function App() {
                   onChange={handleSetupDraftChange}
                 />
               </label>
-              <div className="field-label">
-                Type
-                <div className="setup-static-field">Saved as a timed commitment</div>
-              </div>
+              <label className="field-label">
+                Kind
+                <select
+                  name="firstCommitmentArea"
+                  value={setupDraft.firstCommitmentArea}
+                  onChange={handleSetupDraftChange}
+                >
+                  {SETUP_AREA_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
             </div>
-            <label className="field-label">
-              Note
-              <textarea
-                name="firstCommitmentNote"
-                rows={3}
-                value={setupDraft.firstCommitmentNote}
-                onChange={handleSetupDraftChange}
-                placeholder="Anything future-you should know"
-              />
-            </label>
           </section>
 
           <div className="tool-row setup-actions">
-            <button type="submit">Save and open dashboard</button>
-            <a
-              className="button-like ghost"
-              href={buildPageHref(pageContext.basePath, "systems")}
-            >
-              Detailed settings later
+            <button type="submit">Continue</button>
+            <a className="mini-text-button" href={buildPageHref(pageContext.basePath, "systems")}>
+              More later
             </a>
           </div>
         </div>

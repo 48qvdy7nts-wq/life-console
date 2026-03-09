@@ -94,7 +94,7 @@ textarea {
 }
 
 .page-setup {
-  max-width: 1180px;
+  max-width: 1040px;
 }
 
 .site-nav,
@@ -169,7 +169,7 @@ textarea {
 }
 
 .site-nav.is-setup {
-  margin-bottom: 48px;
+  margin-bottom: 24px;
 }
 
 .nav-links {
@@ -518,25 +518,28 @@ textarea {
 
 .setup-shell {
   display: grid;
-  gap: 40px;
-  grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
-  align-items: start;
+  max-width: 720px;
+  margin: 28px auto 0;
+  gap: 18px;
+  grid-template-columns: 1fr;
+  align-items: stretch;
 }
 
 .setup-copy {
   display: grid;
-  gap: 16px;
-  padding-top: 18px;
-  position: sticky;
-  top: 108px;
+  gap: 6px;
+  justify-items: center;
+  padding-top: 0;
+  position: static;
+  text-align: center;
 }
 
 .setup-copy h1 {
   margin: 0;
-  max-width: 10ch;
-  font-size: clamp(2rem, 4vw, 3.15rem);
-  line-height: 0.96;
-  letter-spacing: -0.05em;
+  max-width: 8ch;
+  font-size: clamp(2.3rem, 5vw, 3.6rem);
+  line-height: 0.94;
+  letter-spacing: -0.06em;
 }
 
 .setup-points,
@@ -547,45 +550,35 @@ textarea {
 
 .setup-support {
   margin: 0;
-  max-width: 28ch;
+  max-width: 18ch;
   color: var(--muted);
-  line-height: 1.55;
-}
-
-.setup-point {
-  display: grid;
-  gap: 4px;
-  margin: 0;
-  padding: 14px 0;
-  border-top: 1px solid var(--line);
-  color: var(--muted);
-}
-
-.setup-point span:last-child {
-  line-height: 1.55;
+  line-height: 1.45;
 }
 
 .setup-form-card {
-  padding: 24px 28px 28px;
-  border-radius: 30px;
-  background: rgba(255, 255, 255, 0.9);
+  padding: 24px 24px 22px;
+  border-radius: 32px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 18px 40px rgba(20, 24, 31, 0.05);
 }
 
 .setup-form-stack {
   padding: 0;
-  gap: 18px;
+  gap: 22px;
 }
 
 .setup-section-block + .setup-section-block {
-  padding-top: 20px;
+  padding-top: 18px;
   border-top: 1px solid var(--line);
 }
 
-.setup-section-block h3 {
-  margin: 6px 0 0;
-  font-size: 1.18rem;
-  font-weight: 620;
-  letter-spacing: -0.03em;
+.setup-section-label {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
 }
 
 .setup-note-grid {
@@ -595,26 +588,37 @@ textarea {
 }
 
 .setup-actions {
-  padding-top: 8px;
-}
-
-.field-hint {
-  color: var(--muted);
-  font-size: 0.92rem;
-  font-weight: 520;
-  line-height: 1.45;
-}
-
-.setup-static-field {
-  display: flex;
   align-items: center;
-  min-height: 52px;
-  padding: 13px 15px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  background: rgba(246, 245, 241, 0.92);
-  color: var(--muted);
+  justify-content: space-between;
+  padding-top: 2px;
+}
+
+.setup-form-card .field-label {
+  gap: 6px;
+  color: var(--text);
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.setup-form-card .field-label input,
+.setup-form-card .field-label select,
+.setup-form-card .field-label textarea {
+  padding: 15px 16px;
+  border-color: rgba(15, 18, 24, 0.08);
+  border-radius: 18px;
+  background: rgba(247, 247, 244, 0.98);
   font-weight: 520;
+}
+
+.setup-form-card .field-label input:focus,
+.setup-form-card .field-label select:focus,
+.setup-form-card .field-label textarea:focus {
+  border-color: rgba(15, 18, 24, 0.16);
+  box-shadow: 0 0 0 4px rgba(15, 18, 24, 0.04);
+}
+
+.site-nav.is-setup .nav-brand {
+  gap: 0;
 }
 
 .sidebar-stack {
@@ -1346,7 +1350,6 @@ button:focus-visible,
   .site-nav,
   .page-intro,
   .hero,
-  .setup-shell,
   .calendar-search-grid,
   .main-grid,
   .systems-grid,
@@ -1374,13 +1377,8 @@ button:focus-visible,
     grid-template-columns: 1fr;
   }
 
-  .setup-copy {
-    padding-top: 0;
-    position: static;
-  }
-
   .page-setup {
-    max-width: 1280px;
+    max-width: 1040px;
   }
 }
 
