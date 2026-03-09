@@ -9,6 +9,7 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: resolve(__dirname, "index.html"),
+        setup: resolve(__dirname, "setup/index.html"),
         today: resolve(__dirname, "today/index.html"),
         calendar: resolve(__dirname, "calendar/index.html"),
         commitments: resolve(__dirname, "commitments/index.html"),

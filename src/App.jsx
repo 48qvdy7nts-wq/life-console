@@ -92,6 +92,15 @@ const PAGE_DEFINITIONS = [
     copy: "The top-level answer before you decide whether to dive deeper.",
   },
   {
+    id: "setup",
+    segment: "setup",
+    label: "Setup",
+    eyebrow: "Onboarding",
+    title: "Set up your board",
+    copy: "Save the small set of details this dashboard should always know.",
+    nav: false,
+  },
+  {
     id: "today",
     segment: "today",
     label: "Today",
@@ -235,6 +244,33 @@ function buildWakePlanCopy(sleepModel, locale) {
   return {
     label: formatTimeOnly(sleepModel.upcomingWake, locale),
     detail: "Using your default wake time because nothing earlier on that day forces it.",
+  };
+}
+
+function buildSetupDraft(profile, areaNotes) {
+  return {
+    displayName: profile?.displayName || "",
+    wakeTime: profile?.wakeTime || defaultProfileWithAutomation.wakeTime,
+    latestReadyMinutes:
+      profile?.latestReadyMinutes || defaultProfileWithAutomation.latestReadyMinutes,
+    idealReadyMinutes:
+      profile?.idealReadyMinutes || defaultProfileWithAutomation.idealReadyMinutes,
+    sleepTargetHours:
+      profile?.sleepTargetHours || defaultProfileWithAutomation.sleepTargetHours,
+    gamingCutoff: profile?.gamingCutoff || defaultProfileWithAutomation.gamingCutoff,
+    notificationLeadMinutes:
+      profile?.notificationLeadMinutes || defaultProfileWithAutomation.notificationLeadMinutes,
+    academic: areaNotes?.academic || "",
+    work: areaNotes?.work || "",
+    social: areaNotes?.social || "",
+    love: areaNotes?.love || "",
+    hobbies: areaNotes?.hobbies || "",
+    future: areaNotes?.future || "",
+    firstCommitmentTitle: "",
+    firstCommitmentArea: "academic",
+    firstCommitmentDueAt: "",
+    firstCommitmentNote: "",
+    firstCommitmentHard: true,
   };
 }
 
@@ -787,7 +823,23 @@ function countRoutineProgress(period, routineState, now) {
   };
 }
 
-function SiteNav({ links, currentPageId }) {
+function SiteNav({ links, currentPageId, basePath }) {
+  const navLinks = links.filter((link) => link.nav !== false);
+
+  if (currentPageId === "setup") {
+    return (
+      <header className="site-nav reveal is-setup">
+        <div className="nav-brand">
+          <p className="eyebrow">Personal dashboard</p>
+          <h1>Life Console</h1>
+        </div>
+        <a className="mini-text-button" href={buildPageHref(basePath, "dashboard")}>
+          Skip for now
+        </a>
+      </header>
+    );
+  }
+
   return (
     <header className="site-nav reveal">
       <div className="nav-brand">
@@ -795,7 +847,7 @@ function SiteNav({ links, currentPageId }) {
         <h1>Life Console</h1>
       </div>
       <nav className="nav-links" aria-label="Primary">
-        {links.map((link) => (
+        {navLinks.map((link) => (
           <a
             key={link.id}
             href={link.href}
@@ -907,6 +959,7 @@ function App() {
   const [setupState, setSetupState] = useState(() =>
     normalizeSetupState(readStorage(STORAGE_KEYS.setup, {}))
   );
+  const [setupDraft, setSetupDraft] = useState(() => buildSetupDraft(profile, areaNotes));
 
   const [draft, setDraft] = useState(defaultDraft);
   const [scenarioId, setScenarioId] = useState(scenarioDefinitions[0].id);
@@ -1357,6 +1410,11 @@ function App() {
       folderScan?.items?.length ||
       syncConfig.gistId?.trim()
   );
+
+  function countLabel(count, noun) {
+    return `${count} ${noun}${count === 1 ? "" : "s"}`;
+  }
+
   const setupSteps = onboardingStepDefinitions.map((definition) => {
     let done = false;
     let status = "";
@@ -1604,6 +1662,99 @@ function App() {
     );
   }
 
+  function handleSetupDraftChange(event) {
+    const { name, value, type, checked } = event.target;
+    setSetupDraft((current) => ({
+      ...current,
+      [name]:
+        type === "checkbox"
+          ? checked
+          : [
+                "latestReadyMinutes",
+                "idealReadyMinutes",
+                "sleepTargetHours",
+                "notificationLeadMinutes",
+              ].includes(name)
+            ? toPositiveNumber(value, current[name])
+            : value,
+    }));
+  }
+
+  function handleSetupSubmit(event) {
+    event.preventDefault();
+
+    const nextProfile = normalizeProfile({
+      ...profile,
+      displayName: setupDraft.displayName,
+      wakeTime: setupDraft.wakeTime,
+      latestReadyMinutes: setupDraft.latestReadyMinutes,
+      idealReadyMinutes: setupDraft.idealReadyMinutes,
+      sleepTargetHours: setupDraft.sleepTargetHours,
+      gamingCutoff: setupDraft.gamingCutoff,
+      notificationLeadMinutes: setupDraft.notificationLeadMinutes,
+    });
+
+    const nextAreaNotes = normalizeAreaNotes({
+      ...areaNotes,
+      academic: setupDraft.academic.trim(),
+      work: setupDraft.work.trim(),
+      social: setupDraft.social.trim(),
+      love: setupDraft.love.trim(),
+      hobbies: setupDraft.hobbies.trim(),
+      future: setupDraft.future.trim(),
+    });
+
+    let nextCustomItems = customItems;
+    const firstTitle = setupDraft.firstCommitmentTitle.trim();
+    const firstDueAt = setupDraft.firstCommitmentDueAt
+      ? new Date(setupDraft.firstCommitmentDueAt).toISOString()
+      : "";
+
+    if (firstTitle) {
+      const duplicate = customItems.some(
+        (item) =>
+          item.title.toLowerCase() === firstTitle.toLowerCase() &&
+          item.area === setupDraft.firstCommitmentArea &&
+          (item.dueAt || "") === firstDueAt
+      );
+
+      if (!duplicate) {
+        const nextItem = normalizeItem({
+          id: createId("setup"),
+          title: firstTitle,
+          area: setupDraft.firstCommitmentArea,
+          dueAt: firstDueAt,
+          note: setupDraft.firstCommitmentNote.trim(),
+          hard: setupDraft.firstCommitmentHard,
+          priority: "high",
+          done: false,
+          createdAt: new Date().toISOString(),
+        });
+        nextCustomItems = [nextItem, ...customItems];
+      }
+    }
+
+    const nextSetupState = normalizeSetupState({
+      ...setupState,
+      profileReviewed: true,
+    });
+
+    setProfile(nextProfile);
+    setAreaNotes(nextAreaNotes);
+    setCustomItems(nextCustomItems);
+    setSetupState(nextSetupState);
+    setSetupDraft(buildSetupDraft(nextProfile, nextAreaNotes));
+    setFlash("steady", "Setup saved.");
+
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(STORAGE_KEYS.profile, JSON.stringify(nextProfile));
+      window.localStorage.setItem(STORAGE_KEYS.notes, JSON.stringify(nextAreaNotes));
+      window.localStorage.setItem(STORAGE_KEYS.items, JSON.stringify(nextCustomItems));
+      window.localStorage.setItem(STORAGE_KEYS.setup, JSON.stringify(nextSetupState));
+      window.location.assign(buildPageHref(pageContext.basePath, "dashboard"));
+    }
+  }
+
   function toggleRoutine(template) {
     const key = getRoutineStateKey(template, now);
     setRoutineState((current) => {
@@ -1835,7 +1986,6 @@ function App() {
       : generatedSources.projectSync.warnings?.length
         ? "warm"
         : "missing";
-  const countLabel = (count, noun) => `${count} ${noun}${count === 1 ? "" : "s"}`;
   const nextTimedItem = timedOpenItems[0] || null;
   const wakePlanCopy = buildWakePlanCopy(sleepModel, snapshotInfo.locale);
   const coverageGapLabels = coverageGaps.map((area) => areaDefinitions[area].label).join(", ");
@@ -1892,8 +2042,14 @@ function App() {
           Check the next hard commitment, your sleep timing, and where to go next.
         </p>
         <div className="hero-controls">
-          <a className="button-like" href={buildPageHref(pageContext.basePath, "today")}>
-            Today
+          <a
+            className="button-like"
+            href={buildPageHref(
+              pageContext.basePath,
+              setupState.profileReviewed ? "today" : "setup"
+            )}
+          >
+            {setupState.profileReviewed ? "Today" : "Setup"}
           </a>
           <a
             className="button-like ghost"
@@ -2006,7 +2162,7 @@ function App() {
       />
       <section className="route-grid">
         {pageLinks
-          .filter((link) => link.id !== "dashboard")
+          .filter((link) => link.id !== "dashboard" && link.nav !== false)
           .map((link) => (
             <RouteCard
               key={link.id}
@@ -2019,6 +2175,205 @@ function App() {
           ))}
       </section>
     </>
+  );
+
+  const setupPageSection = (
+    <section className="setup-shell reveal">
+      <div className="setup-copy">
+        <p className="eyebrow">Setup</p>
+        <h1>Start with what the board should remember.</h1>
+        <p className="section-copy">
+          Name, timing, short context, and one real upcoming thing. Everything here stays editable.
+        </p>
+        <div className="setup-points" aria-label="Setup notes">
+          <p className="setup-point">
+            <span className="meta-label">Local first</span>
+            <span>Saved in this browser unless you export or sync.</span>
+          </p>
+          <p className="setup-point">
+            <span className="meta-label">Wake logic</span>
+            <span>Used to decide when tomorrow should override tonight.</span>
+          </p>
+          <p className="setup-point">
+            <span className="meta-label">Start light</span>
+            <span>One real commitment is enough to make the board useful.</span>
+          </p>
+        </div>
+      </div>
+
+      <form className="panel setup-form-card" onSubmit={handleSetupSubmit}>
+        <div className="panel-pad setup-form-stack">
+          <section className="setup-section-block">
+            <div className="inline-heading">
+              <div>
+                <span className="meta-label">01</span>
+                <h3>Identity and timing</h3>
+              </div>
+            </div>
+            <div className="form-row">
+              <label className="field-label">
+                Name
+                <input
+                  type="text"
+                  name="displayName"
+                  value={setupDraft.displayName}
+                  onChange={handleSetupDraftChange}
+                  placeholder="Your name"
+                />
+              </label>
+              <label className="field-label">
+                Default wake time
+                <input
+                  type="time"
+                  name="wakeTime"
+                  value={setupDraft.wakeTime}
+                  onChange={handleSetupDraftChange}
+                />
+              </label>
+            </div>
+            <div className="form-row quad">
+              <label className="field-label">
+                Ideal-ready
+                <input
+                  type="number"
+                  min="0"
+                  name="idealReadyMinutes"
+                  value={setupDraft.idealReadyMinutes}
+                  onChange={handleSetupDraftChange}
+                />
+              </label>
+              <label className="field-label">
+                Latest-ready
+                <input
+                  type="number"
+                  min="0"
+                  name="latestReadyMinutes"
+                  value={setupDraft.latestReadyMinutes}
+                  onChange={handleSetupDraftChange}
+                />
+              </label>
+              <label className="field-label">
+                Sleep target (hours)
+                <input
+                  type="number"
+                  min="1"
+                  name="sleepTargetHours"
+                  value={setupDraft.sleepTargetHours}
+                  onChange={handleSetupDraftChange}
+                />
+              </label>
+              <label className="field-label">
+                Gaming cutoff
+                <input
+                  type="time"
+                  name="gamingCutoff"
+                  value={setupDraft.gamingCutoff}
+                  onChange={handleSetupDraftChange}
+                />
+              </label>
+            </div>
+          </section>
+
+          <section className="setup-section-block">
+            <div className="inline-heading">
+              <div>
+                <span className="meta-label">02</span>
+                <h3>Life notes</h3>
+              </div>
+            </div>
+            <div className="setup-note-grid">
+              {areaOrder.map((area) => (
+                <label key={area} className="field-label">
+                  {areaDefinitions[area].label}
+                  <textarea
+                    name={area}
+                    rows={3}
+                    value={setupDraft[area]}
+                    onChange={handleSetupDraftChange}
+                    placeholder={areaNotePrompts[area][0]}
+                  />
+                </label>
+              ))}
+            </div>
+          </section>
+
+          <section className="setup-section-block">
+            <div className="inline-heading">
+              <div>
+                <span className="meta-label">03</span>
+                <h3>First real commitment</h3>
+              </div>
+            </div>
+            <div className="form-row">
+              <label className="field-label">
+                Title
+                <input
+                  type="text"
+                  name="firstCommitmentTitle"
+                  value={setupDraft.firstCommitmentTitle}
+                  onChange={handleSetupDraftChange}
+                  placeholder="Tomorrow's class, a date, an assignment, a call"
+                />
+              </label>
+              <label className="field-label">
+                Area
+                <select
+                  name="firstCommitmentArea"
+                  value={setupDraft.firstCommitmentArea}
+                  onChange={handleSetupDraftChange}
+                >
+                  {areaOrder.map((area) => (
+                    <option key={area} value={area}>
+                      {areaDefinitions[area].label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <div className="form-row">
+              <label className="field-label">
+                When
+                <input
+                  type="datetime-local"
+                  name="firstCommitmentDueAt"
+                  value={setupDraft.firstCommitmentDueAt}
+                  onChange={handleSetupDraftChange}
+                />
+              </label>
+              <label className="field-label checkbox-field">
+                Hard commitment
+                <input
+                  type="checkbox"
+                  name="firstCommitmentHard"
+                  checked={setupDraft.firstCommitmentHard}
+                  onChange={handleSetupDraftChange}
+                />
+              </label>
+            </div>
+            <label className="field-label">
+              Note
+              <textarea
+                name="firstCommitmentNote"
+                rows={3}
+                value={setupDraft.firstCommitmentNote}
+                onChange={handleSetupDraftChange}
+                placeholder="Anything future-you should know when this comes up"
+              />
+            </label>
+          </section>
+
+          <div className="tool-row setup-actions">
+            <button type="submit">Save and open dashboard</button>
+            <a
+              className="button-like ghost"
+              href={buildPageHref(pageContext.basePath, "systems")}
+            >
+              Go to imports instead
+            </a>
+          </div>
+        </div>
+      </form>
+    </section>
   );
 
   const setupGuidePanel = (
@@ -3310,6 +3665,9 @@ function App() {
   let pageContent;
 
   switch (pageContext.pageId) {
+    case "setup":
+      pageContent = setupPageSection;
+      break;
     case "today":
       pageContent = (
         <>
@@ -3414,8 +3772,12 @@ function App() {
   return (
     <div className="app-shell">
       <div className="background-grid" />
-      <main className="page">
-        <SiteNav links={pageLinks} currentPageId={pageContext.pageId} />
+      <main className={`page ${pageContext.pageId === "setup" ? "page-setup" : ""}`}>
+        <SiteNav
+          links={pageLinks}
+          currentPageId={pageContext.pageId}
+          basePath={pageContext.basePath}
+        />
         {flashMessage ? <p className={`flash global-flash tone-${flashMessage.tone}`}>{flashMessage.text}</p> : null}
         {pageContent}
       </main>

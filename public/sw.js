@@ -1,7 +1,9 @@
-const CACHE_NAME = "life-console-v2";
+const CACHE_NAME = "life-console-v3";
 const PRECACHE = [
   "./",
   "./index.html",
+  "./setup/",
+  "./setup/index.html",
   "./today/",
   "./today/index.html",
   "./calendar/",

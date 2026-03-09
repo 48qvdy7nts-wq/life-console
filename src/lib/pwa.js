@@ -1,4 +1,5 @@
 const PAGE_SEGMENTS = new Set([
+  "setup",
   "today",
   "calendar",
   "commitments",
