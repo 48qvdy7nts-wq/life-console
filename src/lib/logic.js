@@ -245,6 +245,16 @@ export function normalizeProfile(profile) {
         : typeof next.bankBalance === "number" && Number.isFinite(next.bankBalance)
           ? String(next.bankBalance)
           : defaultProfileWithAutomation.bankBalance,
+    creditCardOwed:
+      typeof next.creditCardOwed === "string"
+        ? next.creditCardOwed.trim()
+        : typeof next.creditCardOwed === "number" && Number.isFinite(next.creditCardOwed)
+          ? String(next.creditCardOwed)
+          : defaultProfileWithAutomation.creditCardOwed,
+    dinnerPreference:
+      typeof next.dinnerPreference === "string"
+        ? next.dinnerPreference.trim()
+        : defaultProfileWithAutomation.dinnerPreference,
     wakeTime:
       typeof next.wakeTime === "string" && next.wakeTime.includes(":")
         ? next.wakeTime

@@ -145,8 +145,8 @@ const PAGE_DEFINITIONS = [
     segment: "systems",
     label: "Systems",
     eyebrow: "Sources and setup",
-    title: "Profile, sync, and imports",
-    copy: "The operational layer: sources, scan presets, profile tuning, imports, and cloud sync.",
+    title: "Systems",
+    copy: "Hub data, sources, and backup.",
   },
   {
     id: "projects",
@@ -1726,6 +1726,30 @@ function App() {
     );
   }
 
+  function handleEssentialsChange(event) {
+    const { name, value } = event.target;
+
+    if (name === "morningBufferMinutes") {
+      const nextBuffer = toPositiveNumber(value, profile.idealReadyMinutes);
+      setProfile((current) =>
+        normalizeProfile({
+          ...current,
+          idealReadyMinutes: nextBuffer,
+          latestReadyMinutes: deriveLatestReadyMinutes(nextBuffer),
+        })
+      );
+      return;
+    }
+
+    setProfile((current) =>
+      normalizeProfile({
+        ...current,
+        [name]:
+          name === "sleepTargetHours" ? toPositiveNumber(value, current[name]) : value,
+      })
+    );
+  }
+
   function handleSetupDraftChange(event) {
     const { name, value, type, checked } = event.target;
     setSetupDraft((current) => ({
@@ -2045,6 +2069,8 @@ function App() {
   const nextWorkItem = workOpenItems[0] || null;
   const nextSocialItem = socialOpenItems[0] || null;
   const savedBalance = profile.bankBalance?.trim() || "";
+  const savedCardDebt = profile.creditCardOwed?.trim() || "";
+  const savedDinnerPreference = profile.dinnerPreference?.trim() || "";
 
   function buildBubbleTimeLabel(item) {
     if (!item) {
@@ -2072,15 +2098,15 @@ function App() {
       id: "balance",
       label: "Balance",
       value: savedBalance || "Set",
-      meta: savedBalance ? "Manual total" : "Add in Systems",
+      meta: savedCardDebt ? `Card ${savedCardDebt}` : savedBalance ? "Manual total" : "Add in Systems",
       tone: savedBalance ? "steady" : "missing",
       detailTitle: savedBalance || "Balance not set",
       detailBody: savedBalance
         ? "Tracked manually in your profile."
         : "Add your total bank balance in Systems.",
       facts: [
-        { label: "State", value: savedBalance ? "Saved" : "Missing" },
-        { label: "Source", value: "Manual" },
+        { label: "Bank", value: savedBalance || "Missing" },
+        { label: "Card owed", value: savedCardDebt || "Missing" },
       ],
       actions: [{ pageId: "systems", label: "Open Systems" }],
     },
@@ -2130,17 +2156,20 @@ function App() {
       value: nextSocialItem ? buildBubbleTimeLabel(nextSocialItem) : "Quiet",
       meta: nextSocialItem
         ? truncateLabel(nextSocialItem.title, "Plan")
-        : truncateLabel(areaNotes.social || areaNotes.love, "No plan logged"),
+        : truncateLabel(savedDinnerPreference || areaNotes.social || areaNotes.love, "No plan logged"),
       tone: nextSocialItem ? "future" : "warm",
       detailTitle: nextSocialItem
         ? nextSocialItem.title
-        : truncateLabel(areaNotes.social || areaNotes.love, "No social plan"),
+        : truncateLabel(savedDinnerPreference || areaNotes.social || areaNotes.love, "No social plan"),
       detailBody: nextSocialItem
         ? formatDateTime(nextSocialItem.viewDueAt || nextSocialItem.dueAt, snapshotInfo.locale)
-        : areaNotes.social || areaNotes.love || "No social or love plan is logged right now.",
+        : savedDinnerPreference ||
+          areaNotes.social ||
+          areaNotes.love ||
+          "No social or love plan is logged right now.",
       facts: [
         { label: "Plans", value: String(socialOpenItems.length) },
-        { label: "Next", value: nextSocialItem ? buildBubbleTimeLabel(nextSocialItem) : "None" },
+        { label: "Dinner", value: savedDinnerPreference || "Missing" },
       ],
       actions: [
         { pageId: "areas", label: "Open Areas" },
@@ -3425,6 +3454,342 @@ function App() {
     </article>
   );
 
+  const systemsEssentialsPanel = (
+    <article className="panel reveal" id="profile-panel">
+      <SectionHeading
+        eyebrow="Hub data"
+        title="Keep the homepage useful"
+        copy="Only the fields that should surface fast."
+      />
+      <div className="systems-essentials-grid">
+        <section className="system-card">
+          <div className="system-card-head">
+            <span className="meta-label">Money</span>
+            <strong>{profile.bankBalance?.trim() || "Missing"}</strong>
+          </div>
+          <div className="system-card-fields">
+            <label className="field-label">
+              Bank balance
+              <input
+                name="bankBalance"
+                value={profile.bankBalance}
+                onChange={handleEssentialsChange}
+                placeholder="$0"
+              />
+            </label>
+            <label className="field-label">
+              Credit card owed
+              <input
+                name="creditCardOwed"
+                value={profile.creditCardOwed}
+                onChange={handleEssentialsChange}
+                placeholder="$0"
+              />
+            </label>
+          </div>
+        </section>
+
+        <section className="system-card">
+          <div className="system-card-head">
+            <span className="meta-label">Social</span>
+            <strong>{profile.dinnerPreference?.trim() ? "Saved" : "Missing"}</strong>
+          </div>
+          <div className="system-card-fields">
+            <label className="field-label">
+              Dinner she likes
+              <input
+                name="dinnerPreference"
+                value={profile.dinnerPreference}
+                onChange={handleEssentialsChange}
+                placeholder="Sushi, pasta, poke, burgers"
+              />
+            </label>
+            <a className="mini-text-button" href={buildPageHref(pageContext.basePath, "areas")}>
+              Open social notes
+            </a>
+          </div>
+        </section>
+
+        <section className="system-card">
+          <div className="system-card-head">
+            <span className="meta-label">Timing</span>
+            <strong>{wakePlanCopy.label}</strong>
+          </div>
+          <div className="system-card-fields">
+            <label className="field-label">
+              Wake time
+              <input
+                name="wakeTime"
+                type="time"
+                value={profile.wakeTime}
+                onChange={handleEssentialsChange}
+              />
+            </label>
+            <label className="field-label">
+              Buffer before plans
+              <input
+                name="morningBufferMinutes"
+                type="number"
+                min="0"
+                step="5"
+                value={profile.idealReadyMinutes}
+                onChange={handleEssentialsChange}
+              />
+            </label>
+            <label className="field-label">
+              Sleep hours
+              <input
+                name="sleepTargetHours"
+                type="number"
+                min="5"
+                max="12"
+                step="0.5"
+                value={profile.sleepTargetHours}
+                onChange={handleEssentialsChange}
+              />
+            </label>
+          </div>
+        </section>
+      </div>
+
+      <details className="systems-details">
+        <summary>More settings</summary>
+        <div className="systems-details-body">
+          <div className="profile-grid compact-profile-grid">
+            <label className="field-label">
+              Name
+              <input
+                name="displayName"
+                value={profile.displayName}
+                onChange={handleProfileChange}
+              />
+            </label>
+            <label className="field-label">
+              Latest-ready minutes
+              <input
+                name="latestReadyMinutes"
+                type="number"
+                min="0"
+                step="5"
+                value={profile.latestReadyMinutes}
+                onChange={handleProfileChange}
+              />
+            </label>
+            <label className="field-label">
+              Wind-down minutes
+              <input
+                name="windDownMinutes"
+                type="number"
+                min="0"
+                step="5"
+                value={profile.windDownMinutes}
+                onChange={handleProfileChange}
+              />
+            </label>
+            <label className="field-label">
+              Gaming cutoff
+              <input
+                name="gamingCutoff"
+                type="time"
+                value={profile.gamingCutoff}
+                onChange={handleProfileChange}
+              />
+            </label>
+            <label className="field-label">
+              Focus block minutes
+              <input
+                name="focusBlockMinutes"
+                type="number"
+                min="15"
+                step="5"
+                value={profile.focusBlockMinutes}
+                onChange={handleProfileChange}
+              />
+            </label>
+            <label className="field-label">
+              Reminder lead minutes
+              <input
+                name="notificationLeadMinutes"
+                type="number"
+                min="5"
+                step="5"
+                value={profile.notificationLeadMinutes}
+                onChange={handleProfileChange}
+              />
+            </label>
+          </div>
+        </div>
+      </details>
+    </article>
+  );
+
+  const systemsSourcesPanel = (
+    <article className="panel reveal" id="sources-panel">
+      <SectionHeading
+        eyebrow="Sources"
+        title="Automatic where possible"
+        copy="Local sources and imports feed the board."
+      />
+      <div className="systems-source-strip">
+        <article className={`source-card compact tone-${appleStatusTone}`}>
+          <span className="meta-label">Apple</span>
+          <strong>{generatedSources.apple.items.length}</strong>
+          <p>{generatedSources.apple.generatedAt ? "Synced file" : "No file yet"}</p>
+        </article>
+        <article className={`source-card compact tone-${localScanStatusTone}`}>
+          <span className="meta-label">Local scan</span>
+          <strong>{generatedSources.localScan.items.length}</strong>
+          <p>{generatedSources.localScan.generatedAt ? "Generated" : "No scan yet"}</p>
+        </article>
+        <article className={`source-card compact tone-${projectSyncStatusTone}`}>
+          <span className="meta-label">Projects</span>
+          <strong>{generatedSources.projectSync.projects.length}</strong>
+          <p>{generatedSources.projectSync.generatedAt ? "Generated" : "No sync yet"}</p>
+        </article>
+      </div>
+
+      <div className="tool-row systems-primary-actions">
+        <label className="button-like ghost">
+          Import file
+          <input
+            type="file"
+            accept=".json,.csv,.ics,.txt,.md"
+            onChange={handleImportFile}
+          />
+        </label>
+        <button type="button" className="ghost" onClick={runFolderScan}>
+          Scan folder
+        </button>
+        <button type="button" className="ghost" onClick={exportSnapshot}>
+          Export snapshot
+        </button>
+      </div>
+
+      {folderScan ? (
+        <div className="systems-inline-result">
+          <div className="inline-heading">
+            <h3>{folderScan.directoryName}</h3>
+            <span>{folderScan.items.length} candidates</span>
+          </div>
+          <div className="search-results small">
+            {folderScan.items.slice(0, 6).map((item) => (
+              <article key={`${item.title}-${item.dueAt}`} className="search-card">
+                <span className={`area-pill area-${item.area}`}>
+                  {areaDefinitions[item.area].label}
+                </span>
+                <h3>{item.title}</h3>
+                <p>{formatDateTime(item.dueAt, snapshotInfo.locale)}</p>
+              </article>
+            ))}
+          </div>
+          <div className="tool-row">
+            <button type="button" onClick={importScannedItems}>
+              Add scanned items
+            </button>
+            <button type="button" className="ghost" onClick={() => setFolderScan(null)}>
+              Clear
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      <details className="systems-details">
+        <summary>Templates and local scripts</summary>
+        <div className="systems-details-body">
+          <div className="template-grid compact-template-grid">
+            {templateLinks.map((template) => (
+              <a key={template.id} className="template-card" href={template.href} download>
+                <span className="source-pill">{template.label}</span>
+                <h3>{template.label}</h3>
+                <p>{template.detail}</p>
+              </a>
+            ))}
+          </div>
+          <div className="systems-script-notes">
+            <p>Apple: `npm run sync:apple`</p>
+            <p>Local scan: `npm run sync:local`</p>
+            <p>Projects: `npm run sync:projects`</p>
+          </div>
+        </div>
+      </details>
+    </article>
+  );
+
+  const systemsBackupPanel = (
+    <article className="panel reveal">
+      <SectionHeading
+        eyebrow="Backup"
+        title="Keep it portable"
+        copy="Export locally. Sync if you want it on multiple devices."
+      />
+      <div className="tool-row systems-primary-actions">
+        <button type="button" onClick={exportSnapshot}>
+          Export snapshot
+        </button>
+        <button type="button" className="ghost" onClick={resetLocalData}>
+          Reset local data
+        </button>
+      </div>
+
+      <details className="systems-details">
+        <summary>GitHub Gist sync</summary>
+        <div className="systems-details-body">
+          <div className="profile-grid compact-profile-grid cloud-grid">
+            <label className="field-label">
+              Gist ID
+              <input
+                value={syncConfig.gistId}
+                onChange={(event) =>
+                  setSyncConfig((current) =>
+                    normalizeSyncConfig({ ...current, gistId: event.target.value })
+                  )
+                }
+                placeholder="Filled after first push"
+              />
+            </label>
+            <label className="field-label">
+              File name
+              <input
+                value={syncConfig.filename}
+                onChange={(event) =>
+                  setSyncConfig((current) =>
+                    normalizeSyncConfig({ ...current, filename: event.target.value })
+                  )
+                }
+              />
+            </label>
+            <label className="field-label full-span">
+              GitHub token
+              <input
+                type="password"
+                value={syncConfig.token}
+                onChange={(event) =>
+                  setSyncConfig((current) =>
+                    normalizeSyncConfig({ ...current, token: event.target.value })
+                  )
+                }
+                placeholder="Personal access token with gist scope"
+              />
+            </label>
+          </div>
+          <div className="tool-row">
+            <button type="button" onClick={pushCloudSync} disabled={isCloudLoading}>
+              Push to Gist
+            </button>
+            <button type="button" className="ghost" onClick={pullCloudSync} disabled={isCloudLoading}>
+              Pull from Gist
+            </button>
+          </div>
+          {cloudStatus ? (
+            <p className={`flash tone-${cloudStatus.tone}`}>{cloudStatus.text}</p>
+          ) : (
+            <p className="small-copy">Token stays in this browser.</p>
+          )}
+        </div>
+      </details>
+    </article>
+  );
+
   const areaSummarySection = (
     <section className="area-grid">
       {areaOrder.map((area) => {
@@ -3630,12 +3995,7 @@ function App() {
       buildNavAction("commitments", "Open commitments"),
       buildNavAction("search", "Search all", "button-like ghost"),
     ],
-    systems: [
-      buildNavAction("commitments", "Open commitments"),
-      <button key="export-snapshot" type="button" className="ghost" onClick={exportSnapshot}>
-        Export snapshot
-      </button>,
-    ],
+    systems: [],
     projects: [
       buildNavAction("today", "Back to today"),
       buildNavAction("systems", "Open systems", "button-like ghost"),
@@ -3725,12 +4085,10 @@ function App() {
       pageContent = (
         <>
           {pageIntroSection}
-          {setupGuidePanel}
-          {intakeGuidePanel}
-          {sourcesPanel}
-          <section className="systems-grid">
-            {profilePanel}
-            {syncPanel}
+          {systemsEssentialsPanel}
+          <section className="systems-grid systems-grid-tight">
+            {systemsSourcesPanel}
+            {systemsBackupPanel}
           </section>
         </>
       );

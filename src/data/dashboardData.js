@@ -386,6 +386,8 @@ export const routineTemplates = [
 export const defaultProfile = {
   displayName: "Syeve",
   bankBalance: "",
+  creditCardOwed: "",
+  dinnerPreference: "",
   wakeTime: "09:00",
   latestReadyMinutes: 30,
   idealReadyMinutes: 60,
