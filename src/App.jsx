@@ -96,9 +96,17 @@ const PAGE_DEFINITIONS = [
     segment: "setup",
     label: "Setup",
     eyebrow: "Onboarding",
-    title: "Set up your board",
-    copy: "Save the small set of details this dashboard should always know.",
+    title: "Set up your account",
+    copy: "Add the minimum this site should know before you use it.",
     nav: false,
+  },
+  {
+    id: "account",
+    segment: "account",
+    label: "Account",
+    eyebrow: "Profile",
+    title: "Account",
+    copy: "Your personal data, defaults, and first saved commitment.",
   },
   {
     id: "today",
@@ -144,9 +152,9 @@ const PAGE_DEFINITIONS = [
     id: "systems",
     segment: "systems",
     label: "Systems",
-    eyebrow: "Sources and setup",
+    eyebrow: "Sources and backup",
     title: "Systems",
-    copy: "Hub data, sources, and backup.",
+    copy: "Imports, sources, and backups.",
   },
   {
     id: "projects",
@@ -168,7 +176,6 @@ const SETUP_AREA_OPTIONS = [
 ];
 
 const SYSTEMS_PANE_DEFINITIONS = [
-  { id: "hub", label: "Hub", sectionId: "profile-panel" },
   { id: "sources", label: "Sources", sectionId: "sources-panel" },
   { id: "backup", label: "Backup", sectionId: "backup-panel" },
 ];
@@ -304,6 +311,9 @@ function formatMoneyValue(value, locale = snapshotInfo.locale) {
 function buildSetupDraft(profile) {
   return {
     displayName: profile?.displayName || "",
+    bankBalance: profile?.bankBalance || "",
+    creditCardOwed: profile?.creditCardOwed || "",
+    dinnerPreference: profile?.dinnerPreference || "",
     wakeTime: profile?.wakeTime || defaultProfileWithAutomation.wakeTime,
     morningBufferMinutes:
       profile?.idealReadyMinutes || defaultProfileWithAutomation.idealReadyMinutes,
@@ -1838,6 +1848,7 @@ function App() {
 
   function handleSetupSubmit(event) {
     event.preventDefault();
+    const shouldRedirect = pageContext.pageId === "setup";
 
     const morningBufferMinutes = toPositiveNumber(
       setupDraft.morningBufferMinutes,
@@ -1847,6 +1858,9 @@ function App() {
     const nextProfile = normalizeProfile({
       ...profile,
       displayName: setupDraft.displayName,
+      bankBalance: setupDraft.bankBalance,
+      creditCardOwed: setupDraft.creditCardOwed,
+      dinnerPreference: setupDraft.dinnerPreference,
       wakeTime: setupDraft.wakeTime,
       latestReadyMinutes: deriveLatestReadyMinutes(morningBufferMinutes),
       idealReadyMinutes: morningBufferMinutes,
@@ -1892,13 +1906,15 @@ function App() {
     setCustomItems(nextCustomItems);
     setSetupState(nextSetupState);
     setSetupDraft(buildSetupDraft(nextProfile));
-    setFlash("steady", "Setup saved.");
+    setFlash("steady", shouldRedirect ? "Setup saved." : "Account saved.");
 
     if (typeof window !== "undefined") {
       window.localStorage.setItem(STORAGE_KEYS.profile, JSON.stringify(nextProfile));
       window.localStorage.setItem(STORAGE_KEYS.items, JSON.stringify(nextCustomItems));
       window.localStorage.setItem(STORAGE_KEYS.setup, JSON.stringify(nextSetupState));
-      window.location.assign(buildPageHref(pageContext.basePath, "dashboard"));
+      if (shouldRedirect) {
+        window.location.assign(buildPageHref(pageContext.basePath, "dashboard"));
+      }
     }
   }
 
@@ -2177,7 +2193,7 @@ function App() {
         ? `Card ${formattedCardDebt}`
         : formattedBalance
           ? "Manual"
-          : "Add in Hub",
+          : "Add in Account",
       tone: savedBalance ? "steady" : "missing",
       detailTitle: formattedBalance || "Balance not set",
       detailBody: savedBalance ? "Tracked in Hub." : "Add it in Hub.",
@@ -2187,9 +2203,9 @@ function App() {
       ],
       actions: [
         {
-          pageId: "systems",
-          href: buildPageSectionHref(pageContext.basePath, "systems", "profile-panel"),
-          label: "Edit hub",
+          pageId: "account",
+          href: buildPageHref(pageContext.basePath, "account"),
+          label: "Account",
         },
       ],
     },
@@ -2257,9 +2273,9 @@ function App() {
       actions: [
         { pageId: "areas", label: "Areas" },
         {
-          pageId: "systems",
-          href: buildPageSectionHref(pageContext.basePath, "systems", "profile-panel"),
-          label: "Edit hub",
+          pageId: "account",
+          href: buildPageHref(pageContext.basePath, "account"),
+          label: "Account",
           className: "button-like ghost",
         },
       ],
@@ -2282,9 +2298,9 @@ function App() {
       actions: [
         { pageId: "today", label: "Today" },
         {
-          pageId: "systems",
-          href: buildPageSectionHref(pageContext.basePath, "systems", "profile-panel"),
-          label: "Timing",
+          pageId: "account",
+          href: buildPageHref(pageContext.basePath, "account"),
+          label: "Account",
           className: "button-like ghost",
         },
       ],
@@ -2376,109 +2392,182 @@ function App() {
     </section>
   );
 
-  const setupPageSection = (
-    <section className="setup-shell reveal">
-      <div className="setup-copy">
-        <h1>Make it yours.</h1>
-        <p className="setup-support">Change everything later.</p>
-      </div>
+  const isSetupPage = pageContext.pageId === "setup";
+  const accountHeadline = isSetupPage
+    ? "Set up your account."
+    : setupDraft.displayName?.trim() || "Account";
+  const accountSupport = isSetupPage
+    ? "Add the basics. Change the rest later."
+    : "Your personal defaults and quick-reference data.";
+  const accountPrimaryLabel = isSetupPage ? "Continue" : "Save changes";
+  const accountSecondaryLabel = isSetupPage ? "Skip for now" : "Open dashboard";
+  const accountSecondaryHref = isSetupPage
+    ? buildPageHref(pageContext.basePath, "dashboard")
+    : buildPageHref(pageContext.basePath, "dashboard");
 
-      <form className="panel setup-form-card" onSubmit={handleSetupSubmit}>
-        <div className="panel-pad setup-form-stack">
-          <section className="setup-section-block">
-            <p className="setup-section-label">You</p>
-            <div className="form-row">
-              <label className="field-label">
-                Name
-                <input
-                  type="text"
-                  name="displayName"
-                  value={setupDraft.displayName}
-                  onChange={handleSetupDraftChange}
-                  placeholder="Name"
-                />
-              </label>
-              <label className="field-label">
-                Wake time
-                <input
-                  type="time"
-                  name="wakeTime"
-                  value={setupDraft.wakeTime}
-                  onChange={handleSetupDraftChange}
-                />
-              </label>
-            </div>
-            <div className="form-row">
-              <label className="field-label">
-                Buffer before plans
-                <input
-                  type="number"
-                  min="0"
-                  name="morningBufferMinutes"
-                  value={setupDraft.morningBufferMinutes}
-                  onChange={handleSetupDraftChange}
-                />
-              </label>
-              <label className="field-label">
-                Sleep hours
-                <input
-                  type="number"
-                  min="1"
-                  name="sleepTargetHours"
-                  value={setupDraft.sleepTargetHours}
-                  onChange={handleSetupDraftChange}
-                />
-              </label>
-            </div>
-          </section>
+  const accountFormPanel = (
+    <form className="panel setup-form-card account-form-card" onSubmit={handleSetupSubmit}>
+      <div className="panel-pad setup-form-stack">
+        <section className="account-hero">
+          <div className="setup-copy account-copy">
+            <p className="eyebrow">{isSetupPage ? "Setup" : "Account"}</p>
+            <h1>{accountHeadline}</h1>
+            <p className="setup-support">{accountSupport}</p>
+          </div>
+          <div className="account-status-row">
+            <span className="source-pill">
+              {setupState.profileReviewed ? "Saved" : "New"}
+            </span>
+            <span className="source-pill">Local</span>
+            <span className="source-pill">Editable</span>
+          </div>
+        </section>
 
-          <section className="setup-section-block">
-            <p className="setup-section-label">Next thing</p>
+        <section className="setup-section-block">
+          <p className="setup-section-label">Profile</p>
+          <div className="form-row">
             <label className="field-label">
-              Title
+              Name
               <input
                 type="text"
-                name="firstCommitmentTitle"
-                value={setupDraft.firstCommitmentTitle}
+                name="displayName"
+                value={setupDraft.displayName}
                 onChange={handleSetupDraftChange}
-                placeholder="Class, date, assignment"
+                placeholder="Name"
               />
             </label>
-            <div className="form-row">
-              <label className="field-label">
-                When
-                <input
-                  type="datetime-local"
-                  name="firstCommitmentDueAt"
-                  value={setupDraft.firstCommitmentDueAt}
-                  onChange={handleSetupDraftChange}
-                />
-              </label>
-              <label className="field-label">
-                Kind
-                <select
-                  name="firstCommitmentArea"
-                  value={setupDraft.firstCommitmentArea}
-                  onChange={handleSetupDraftChange}
-                >
-                  {SETUP_AREA_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-          </section>
-
-          <div className="tool-row setup-actions">
-            <button type="submit">Continue</button>
-            <a className="mini-text-button" href={buildPageHref(pageContext.basePath, "systems")}>
-              More later
-            </a>
+            <label className="field-label">
+              Wake time
+              <input
+                type="time"
+                name="wakeTime"
+                value={setupDraft.wakeTime}
+                onChange={handleSetupDraftChange}
+              />
+            </label>
           </div>
+          <div className="form-row">
+            <label className="field-label">
+              Buffer before plans
+              <input
+                type="number"
+                min="0"
+                name="morningBufferMinutes"
+                value={setupDraft.morningBufferMinutes}
+                onChange={handleSetupDraftChange}
+              />
+            </label>
+            <label className="field-label">
+              Sleep hours
+              <input
+                type="number"
+                min="1"
+                name="sleepTargetHours"
+                value={setupDraft.sleepTargetHours}
+                onChange={handleSetupDraftChange}
+              />
+            </label>
+          </div>
+        </section>
+
+        <section className="setup-section-block">
+          <p className="setup-section-label">Money</p>
+          <div className="form-row">
+            <label className="field-label">
+              Bank balance
+              <input
+                type="text"
+                name="bankBalance"
+                value={setupDraft.bankBalance}
+                onChange={handleSetupDraftChange}
+                placeholder="$0"
+              />
+            </label>
+            <label className="field-label">
+              Credit card owed
+              <input
+                type="text"
+                name="creditCardOwed"
+                value={setupDraft.creditCardOwed}
+                onChange={handleSetupDraftChange}
+                placeholder="$0"
+              />
+            </label>
+          </div>
+        </section>
+
+        <section className="setup-section-block">
+          <p className="setup-section-label">Social</p>
+          <label className="field-label">
+            Dinner she likes
+            <input
+              type="text"
+              name="dinnerPreference"
+              value={setupDraft.dinnerPreference}
+              onChange={handleSetupDraftChange}
+              placeholder="Sushi, ramen, pasta"
+            />
+          </label>
+        </section>
+
+        <section className="setup-section-block">
+          <p className="setup-section-label">Next thing</p>
+          <label className="field-label">
+            Title
+            <input
+              type="text"
+              name="firstCommitmentTitle"
+              value={setupDraft.firstCommitmentTitle}
+              onChange={handleSetupDraftChange}
+              placeholder="Class, date, assignment"
+            />
+          </label>
+          <div className="form-row">
+            <label className="field-label">
+              When
+              <input
+                type="datetime-local"
+                name="firstCommitmentDueAt"
+                value={setupDraft.firstCommitmentDueAt}
+                onChange={handleSetupDraftChange}
+              />
+            </label>
+            <label className="field-label">
+              Kind
+              <select
+                name="firstCommitmentArea"
+                value={setupDraft.firstCommitmentArea}
+                onChange={handleSetupDraftChange}
+              >
+                {SETUP_AREA_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+        </section>
+
+        <div className="tool-row setup-actions">
+          <button type="submit">{accountPrimaryLabel}</button>
+          <a className="mini-text-button" href={accountSecondaryHref}>
+            {accountSecondaryLabel}
+          </a>
         </div>
-      </form>
+      </div>
+    </form>
+  );
+
+  const setupPageSection = (
+    <section className="setup-shell reveal">
+      {accountFormPanel}
+    </section>
+  );
+
+  const accountPageSection = (
+    <section className="setup-shell reveal">
+      {accountFormPanel}
     </section>
   );
 
@@ -4079,6 +4168,7 @@ function App() {
       buildNavAction("commitments", "Open commitments"),
       buildNavAction("search", "Search all", "button-like ghost"),
     ],
+    account: [],
     systems: [],
     projects: [
       buildNavAction("today", "Back to today"),
@@ -4087,7 +4177,7 @@ function App() {
   }[pageContext.pageId];
 
   const pageIntroSection =
-    ["dashboard", "systems"].includes(pageContext.pageId) ? null : (
+    ["dashboard", "systems", "account"].includes(pageContext.pageId) ? null : (
       <PageIntro
         eyebrow={pageContext.currentDefinition.eyebrow}
         title={pageContext.currentDefinition.title}
@@ -4114,7 +4204,6 @@ function App() {
         ))}
       </div>
       {{
-        hub: systemsEssentialsPanel,
         sources: systemsSourcesPanel,
         backup: systemsBackupPanel,
       }[activeSystemsPane.id]}
@@ -4126,6 +4215,9 @@ function App() {
   switch (pageContext.pageId) {
     case "setup":
       pageContent = setupPageSection;
+      break;
+    case "account":
+      pageContent = accountPageSection;
       break;
     case "today":
       pageContent = (
@@ -4225,16 +4317,20 @@ function App() {
       ? {
           href: buildPageHref(
             pageContext.basePath,
-            setupState.profileReviewed ? "today" : "setup"
+            setupState.profileReviewed ? "account" : "setup"
           ),
-          label: setupState.profileReviewed ? "Pages" : "Setup",
+          label: setupState.profileReviewed ? "Account" : "Setup",
         }
       : null;
 
   return (
     <div className="app-shell">
       <div className="background-grid" />
-      <main className={`page ${pageContext.pageId === "setup" ? "page-setup" : ""}`}>
+      <main
+        className={`page ${
+          ["setup", "account"].includes(pageContext.pageId) ? "page-setup" : ""
+        }`}
+      >
         <SiteNav
           links={pageLinks}
           currentPageId={pageContext.pageId}

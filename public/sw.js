@@ -4,6 +4,8 @@ const PRECACHE = [
   "./index.html",
   "./setup/",
   "./setup/index.html",
+  "./account/",
+  "./account/index.html",
   "./today/",
   "./today/index.html",
   "./calendar/",

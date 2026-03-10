@@ -522,7 +522,7 @@ textarea {
 
 .setup-shell {
   display: grid;
-  max-width: 720px;
+  max-width: 860px;
   margin: 28px auto 0;
   gap: 18px;
   grid-template-columns: 1fr;
@@ -564,6 +564,34 @@ textarea {
   border-radius: 32px;
   background: rgba(255, 255, 255, 0.94);
   box-shadow: 0 18px 40px rgba(20, 24, 31, 0.05);
+}
+
+.account-form-card {
+  max-width: 860px;
+  margin: 0 auto;
+}
+
+.account-hero {
+  display: flex;
+  gap: 18px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.account-copy {
+  justify-items: flex-start;
+  text-align: left;
+}
+
+.account-copy h1 {
+  max-width: none;
+}
+
+.account-status-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
 }
 
 .setup-form-stack {
@@ -1710,6 +1738,14 @@ button:focus-visible,
 
   .site-nav {
     padding: 16px 0 12px;
+  }
+
+  .account-hero {
+    flex-direction: column;
+  }
+
+  .account-status-row {
+    justify-content: flex-start;
   }
 
   .systems-switcher {
