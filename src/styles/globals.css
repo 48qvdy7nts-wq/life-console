@@ -740,6 +740,64 @@ textarea {
   margin-top: 18px;
 }
 
+.systems-surface {
+  display: grid;
+  gap: 18px;
+  max-width: 1020px;
+  margin: 18px auto 0;
+}
+
+.systems-switcher {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  margin: 0 auto;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.7);
+  box-shadow: 0 10px 22px rgba(20, 24, 31, 0.04);
+}
+
+.systems-switcher-button {
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  padding: 10px 18px;
+  font-size: 0.95rem;
+  font-weight: 580;
+  letter-spacing: -0.01em;
+  transition: background 180ms ease, color 180ms ease, box-shadow 180ms ease;
+}
+
+.systems-switcher-button:hover,
+.systems-switcher-button:focus-visible {
+  color: var(--text);
+}
+
+.systems-switcher-button.is-active {
+  background: #ffffff;
+  color: var(--text);
+  box-shadow: 0 10px 18px rgba(20, 24, 31, 0.08);
+}
+
+.systems-panel {
+  max-width: 980px;
+  margin: 0 auto;
+}
+
+.systems-panel .section-heading {
+  padding: 22px 24px 0;
+  margin-bottom: 14px;
+}
+
+.systems-panel .section-heading h2 {
+  font-size: clamp(1.3rem, 2.4vw, 1.72rem);
+}
+
 .systems-grid-tight {
   align-items: start;
 }
@@ -1624,6 +1682,10 @@ button:focus-visible,
     max-width: 1040px;
   }
 
+  .systems-surface {
+    max-width: none;
+  }
+
   .bubble-board {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -1648,6 +1710,16 @@ button:focus-visible,
 
   .site-nav {
     padding: 16px 0 12px;
+  }
+
+  .systems-switcher {
+    width: 100%;
+  }
+
+  .systems-switcher-button {
+    flex: 1 1 0;
+    text-align: center;
+    padding-inline: 12px;
   }
 
   .page-intro {

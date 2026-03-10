@@ -167,6 +167,12 @@ const SETUP_AREA_OPTIONS = [
   { value: "future", label: "Future" },
 ];
 
+const SYSTEMS_PANE_DEFINITIONS = [
+  { id: "hub", label: "Hub", sectionId: "profile-panel" },
+  { id: "sources", label: "Sources", sectionId: "sources-panel" },
+  { id: "backup", label: "Backup", sectionId: "backup-panel" },
+];
+
 function normalizePathSegments(pathname) {
   const segments = String(pathname || "/")
     .split("/")
@@ -229,6 +235,14 @@ function buildPageSectionHref(basePath, pageId, sectionId) {
   return sectionId ? `${href}#${sectionId}` : href;
 }
 
+function getSystemsPaneFromHash(hash) {
+  const sectionId = String(hash || "").replace(/^#/, "");
+  return (
+    SYSTEMS_PANE_DEFINITIONS.find((pane) => pane.sectionId === sectionId)?.id ||
+    SYSTEMS_PANE_DEFINITIONS[0].id
+  );
+}
+
 function toDateTimeLocalValue(date) {
   const value = new Date(date);
   const year = value.getFullYear();
@@ -264,6 +278,27 @@ function deriveLatestReadyMinutes(morningBufferMinutes) {
   }
 
   return Math.max(15, buffer - 30);
+}
+
+function formatMoneyValue(value, locale = snapshotInfo.locale) {
+  const raw = String(value || "").trim();
+
+  if (!raw) {
+    return "";
+  }
+
+  const amount = Number(raw.replace(/[^0-9.-]/g, ""));
+
+  if (!Number.isFinite(amount)) {
+    return raw;
+  }
+
+  return new Intl.NumberFormat(locale, {
+    style: "currency",
+    currency: "CAD",
+    minimumFractionDigits: Number.isInteger(amount) ? 0 : 2,
+    maximumFractionDigits: 2,
+  }).format(amount);
 }
 
 function buildSetupDraft(profile) {
@@ -865,7 +900,6 @@ function SiteNav({ links, currentPageId, basePath, dashboardAction }) {
   return (
     <header className="site-nav reveal">
       <div className="nav-brand">
-        <p className="eyebrow">Personal dashboard</p>
         <h1>Life Console</h1>
       </div>
       <nav className="nav-links" aria-label="Primary">
@@ -936,9 +970,9 @@ function DashboardBubbleDetail({ bubble, basePath }) {
       <div className="tool-row bubble-detail-actions">
         {bubble.actions.map((action) => (
           <a
-            key={`${bubble.id}-${action.pageId}`}
+            key={`${bubble.id}-${action.href || action.pageId}`}
             className={action.className || "button-like"}
-            href={buildPageHref(basePath, action.pageId)}
+            href={action.href || buildPageHref(basePath, action.pageId)}
           >
             {action.label}
           </a>
@@ -1023,6 +1057,9 @@ function App() {
   );
   const [setupDraft, setSetupDraft] = useState(() => buildSetupDraft(profile));
   const [activeDashboardBubbleId, setActiveDashboardBubbleId] = useState(null);
+  const [systemsPane, setSystemsPane] = useState(() =>
+    getSystemsPaneFromHash(typeof window === "undefined" ? "" : window.location.hash)
+  );
 
   const [draft, setDraft] = useState(defaultDraft);
   const [scenarioId, setScenarioId] = useState(scenarioDefinitions[0].id);
@@ -1058,6 +1095,18 @@ function App() {
           : `Life Console | ${pageContext.currentDefinition.label}`;
     }
   }, [pageContext.currentDefinition.label, pageContext.pageId]);
+
+  useEffect(() => {
+    if (pageContext.pageId !== "systems") {
+      return undefined;
+    }
+
+    const syncPane = () => setSystemsPane(getSystemsPaneFromHash(window.location.hash));
+
+    syncPane();
+    window.addEventListener("hashchange", syncPane);
+    return () => window.removeEventListener("hashchange", syncPane);
+  }, [pageContext.pageId]);
 
   useEffect(() => {
     const handler = (event) => {
@@ -1763,6 +1812,30 @@ function App() {
     }));
   }
 
+  function selectSystemsPane(nextPaneId) {
+    setSystemsPane(nextPaneId);
+
+    if (typeof window === "undefined" || pageContext.pageId !== "systems") {
+      return;
+    }
+
+    const pane = SYSTEMS_PANE_DEFINITIONS.find((entry) => entry.id === nextPaneId);
+
+    if (!pane) {
+      return;
+    }
+
+    window.history.replaceState(
+      null,
+      "",
+      buildPageSectionHref(pageContext.basePath, "systems", pane.sectionId)
+    );
+
+    window.requestAnimationFrame(() => {
+      document.getElementById(pane.sectionId)?.scrollIntoView({ block: "start" });
+    });
+  }
+
   function handleSetupSubmit(event) {
     event.preventDefault();
 
@@ -2071,6 +2144,8 @@ function App() {
   const savedBalance = profile.bankBalance?.trim() || "";
   const savedCardDebt = profile.creditCardOwed?.trim() || "";
   const savedDinnerPreference = profile.dinnerPreference?.trim() || "";
+  const formattedBalance = formatMoneyValue(savedBalance, snapshotInfo.locale);
+  const formattedCardDebt = formatMoneyValue(savedCardDebt, snapshotInfo.locale);
 
   function buildBubbleTimeLabel(item) {
     if (!item) {
@@ -2097,18 +2172,26 @@ function App() {
     {
       id: "balance",
       label: "Balance",
-      value: savedBalance || "Set",
-      meta: savedCardDebt ? `Card ${savedCardDebt}` : savedBalance ? "Manual total" : "Add in Systems",
+      value: formattedBalance || "Set",
+      meta: formattedCardDebt
+        ? `Card ${formattedCardDebt}`
+        : formattedBalance
+          ? "Manual"
+          : "Add in Hub",
       tone: savedBalance ? "steady" : "missing",
-      detailTitle: savedBalance || "Balance not set",
-      detailBody: savedBalance
-        ? "Tracked manually in your profile."
-        : "Add your total bank balance in Systems.",
+      detailTitle: formattedBalance || "Balance not set",
+      detailBody: savedBalance ? "Tracked in Hub." : "Add it in Hub.",
       facts: [
-        { label: "Bank", value: savedBalance || "Missing" },
-        { label: "Card owed", value: savedCardDebt || "Missing" },
+        { label: "Bank", value: formattedBalance || "Missing" },
+        { label: "Card owed", value: formattedCardDebt || "Missing" },
       ],
-      actions: [{ pageId: "systems", label: "Open Systems" }],
+      actions: [
+        {
+          pageId: "systems",
+          href: buildPageSectionHref(pageContext.basePath, "systems", "profile-panel"),
+          label: "Edit hub",
+        },
+      ],
     },
     {
       id: "academic",
@@ -2125,8 +2208,8 @@ function App() {
         { label: "Next", value: nextAcademicItem ? buildBubbleTimeLabel(nextAcademicItem) : "None" },
       ],
       actions: [
-        { pageId: "today", label: "Open Today" },
-        { pageId: "commitments", label: "Open Board", className: "button-like ghost" },
+        { pageId: "today", label: "Today" },
+        { pageId: "commitments", label: "Board", className: "button-like ghost" },
       ],
     },
     {
@@ -2146,8 +2229,8 @@ function App() {
         { label: "Project", value: leadProjectTrack?.name || "None" },
       ],
       actions: [
-        { pageId: "projects", label: "Open Projects" },
-        { pageId: "commitments", label: "Open Board", className: "button-like ghost" },
+        { pageId: "projects", label: "Projects" },
+        { pageId: "commitments", label: "Board", className: "button-like ghost" },
       ],
     },
     {
@@ -2172,8 +2255,13 @@ function App() {
         { label: "Dinner", value: savedDinnerPreference || "Missing" },
       ],
       actions: [
-        { pageId: "areas", label: "Open Areas" },
-        { pageId: "commitments", label: "Open Board", className: "button-like ghost" },
+        { pageId: "areas", label: "Areas" },
+        {
+          pageId: "systems",
+          href: buildPageSectionHref(pageContext.basePath, "systems", "profile-panel"),
+          label: "Edit hub",
+          className: "button-like ghost",
+        },
       ],
     },
     {
@@ -2192,13 +2280,21 @@ function App() {
         { label: "Wind down", value: formatTimeOnly(sleepModel.windDownAt, snapshotInfo.locale) },
       ],
       actions: [
-        { pageId: "today", label: "Open Today" },
-        { pageId: "systems", label: "Open Systems", className: "button-like ghost" },
+        { pageId: "today", label: "Today" },
+        {
+          pageId: "systems",
+          href: buildPageSectionHref(pageContext.basePath, "systems", "profile-panel"),
+          label: "Timing",
+          className: "button-like ghost",
+        },
       ],
     },
   ];
   const activeDashboardBubble =
     dashboardBubbles.find((bubble) => bubble.id === activeDashboardBubbleId) || null;
+  const activeSystemsPane =
+    SYSTEMS_PANE_DEFINITIONS.find((pane) => pane.id === systemsPane) ||
+    SYSTEMS_PANE_DEFINITIONS[0];
 
   function buildNavAction(pageId, label, className = "button-like") {
     return (
@@ -3455,17 +3551,13 @@ function App() {
   );
 
   const systemsEssentialsPanel = (
-    <article className="panel reveal" id="profile-panel">
-      <SectionHeading
-        eyebrow="Hub data"
-        title="Keep the homepage useful"
-        copy="Only the fields that should surface fast."
-      />
+    <article className="panel reveal systems-panel" id="profile-panel">
+      <SectionHeading eyebrow="Hub" title="Homepage data" />
       <div className="systems-essentials-grid">
         <section className="system-card">
           <div className="system-card-head">
             <span className="meta-label">Money</span>
-            <strong>{profile.bankBalance?.trim() || "Missing"}</strong>
+            <strong>{formattedBalance || "Missing"}</strong>
           </div>
           <div className="system-card-fields">
             <label className="field-label">
@@ -3505,7 +3597,7 @@ function App() {
               />
             </label>
             <a className="mini-text-button" href={buildPageHref(pageContext.basePath, "areas")}>
-              Open social notes
+              Open notes
             </a>
           </div>
         </section>
@@ -3553,7 +3645,7 @@ function App() {
       </div>
 
       <details className="systems-details">
-        <summary>More settings</summary>
+        <summary>Advanced</summary>
         <div className="systems-details-body">
           <div className="profile-grid compact-profile-grid">
             <label className="field-label">
@@ -3624,33 +3716,29 @@ function App() {
   );
 
   const systemsSourcesPanel = (
-    <article className="panel reveal" id="sources-panel">
-      <SectionHeading
-        eyebrow="Sources"
-        title="Automatic where possible"
-        copy="Local sources and imports feed the board."
-      />
+    <article className="panel reveal systems-panel" id="sources-panel">
+      <SectionHeading eyebrow="Sources" title="Imports and sync" />
       <div className="systems-source-strip">
         <article className={`source-card compact tone-${appleStatusTone}`}>
           <span className="meta-label">Apple</span>
           <strong>{generatedSources.apple.items.length}</strong>
-          <p>{generatedSources.apple.generatedAt ? "Synced file" : "No file yet"}</p>
+          <p>{generatedSources.apple.generatedAt ? "Ready" : "Missing"}</p>
         </article>
         <article className={`source-card compact tone-${localScanStatusTone}`}>
           <span className="meta-label">Local scan</span>
           <strong>{generatedSources.localScan.items.length}</strong>
-          <p>{generatedSources.localScan.generatedAt ? "Generated" : "No scan yet"}</p>
+          <p>{generatedSources.localScan.generatedAt ? "Ready" : "Missing"}</p>
         </article>
         <article className={`source-card compact tone-${projectSyncStatusTone}`}>
           <span className="meta-label">Projects</span>
           <strong>{generatedSources.projectSync.projects.length}</strong>
-          <p>{generatedSources.projectSync.generatedAt ? "Generated" : "No sync yet"}</p>
+          <p>{generatedSources.projectSync.generatedAt ? "Ready" : "Missing"}</p>
         </article>
       </div>
 
       <div className="tool-row systems-primary-actions">
         <label className="button-like ghost">
-          Import file
+          Import
           <input
             type="file"
             accept=".json,.csv,.ics,.txt,.md"
@@ -3658,10 +3746,10 @@ function App() {
           />
         </label>
         <button type="button" className="ghost" onClick={runFolderScan}>
-          Scan folder
+          Scan
         </button>
         <button type="button" className="ghost" onClick={exportSnapshot}>
-          Export snapshot
+          Export
         </button>
       </div>
 
@@ -3694,7 +3782,7 @@ function App() {
       ) : null}
 
       <details className="systems-details">
-        <summary>Templates and local scripts</summary>
+        <summary>Templates</summary>
         <div className="systems-details-body">
           <div className="template-grid compact-template-grid">
             {templateLinks.map((template) => (
@@ -3707,7 +3795,7 @@ function App() {
           </div>
           <div className="systems-script-notes">
             <p>Apple: `npm run sync:apple`</p>
-            <p>Local scan: `npm run sync:local`</p>
+            <p>Local: `npm run sync:local`</p>
             <p>Projects: `npm run sync:projects`</p>
           </div>
         </div>
@@ -3716,12 +3804,8 @@ function App() {
   );
 
   const systemsBackupPanel = (
-    <article className="panel reveal">
-      <SectionHeading
-        eyebrow="Backup"
-        title="Keep it portable"
-        copy="Export locally. Sync if you want it on multiple devices."
-      />
+    <article className="panel reveal systems-panel" id="backup-panel">
+      <SectionHeading eyebrow="Backup" title="Snapshot and Gist" />
       <div className="tool-row systems-primary-actions">
         <button type="button" onClick={exportSnapshot}>
           Export snapshot
@@ -3732,7 +3816,7 @@ function App() {
       </div>
 
       <details className="systems-details">
-        <summary>GitHub Gist sync</summary>
+        <summary>Gist sync</summary>
         <div className="systems-details-body">
           <div className="profile-grid compact-profile-grid cloud-grid">
             <label className="field-label">
@@ -3783,7 +3867,7 @@ function App() {
           {cloudStatus ? (
             <p className={`flash tone-${cloudStatus.tone}`}>{cloudStatus.text}</p>
           ) : (
-            <p className="small-copy">Token stays in this browser.</p>
+            <p className="small-copy">Token stays local.</p>
           )}
         </div>
       </details>
@@ -4003,7 +4087,7 @@ function App() {
   }[pageContext.pageId];
 
   const pageIntroSection =
-    pageContext.pageId === "dashboard" ? null : (
+    ["dashboard", "systems"].includes(pageContext.pageId) ? null : (
       <PageIntro
         eyebrow={pageContext.currentDefinition.eyebrow}
         title={pageContext.currentDefinition.title}
@@ -4011,6 +4095,31 @@ function App() {
         actions={pageIntroActions}
       />
     );
+
+  const systemsSection = (
+    <section className="systems-surface">
+      <div className="systems-switcher reveal" role="tablist" aria-label="Systems sections">
+        {SYSTEMS_PANE_DEFINITIONS.map((pane) => (
+          <button
+            key={pane.id}
+            type="button"
+            role="tab"
+            aria-selected={activeSystemsPane.id === pane.id}
+            aria-controls={pane.sectionId}
+            className={`systems-switcher-button ${activeSystemsPane.id === pane.id ? "is-active" : ""}`}
+            onClick={() => selectSystemsPane(pane.id)}
+          >
+            {pane.label}
+          </button>
+        ))}
+      </div>
+      {{
+        hub: systemsEssentialsPanel,
+        sources: systemsSourcesPanel,
+        backup: systemsBackupPanel,
+      }[activeSystemsPane.id]}
+    </section>
+  );
 
   let pageContent;
 
@@ -4084,12 +4193,7 @@ function App() {
     case "systems":
       pageContent = (
         <>
-          {pageIntroSection}
-          {systemsEssentialsPanel}
-          <section className="systems-grid systems-grid-tight">
-            {systemsSourcesPanel}
-            {systemsBackupPanel}
-          </section>
+          {systemsSection}
         </>
       );
       break;
@@ -4123,7 +4227,7 @@ function App() {
             pageContext.basePath,
             setupState.profileReviewed ? "today" : "setup"
           ),
-          label: setupState.profileReviewed ? "Detailed pages" : "Finish setup",
+          label: setupState.profileReviewed ? "Pages" : "Setup",
         }
       : null;
 
